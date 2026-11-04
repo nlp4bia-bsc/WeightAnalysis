@@ -113,6 +113,7 @@ def test_cli_json_run_matches_python_api_and_writes_only_requested_parquet(cli_s
     output_path = tmp_path / "artifacts" / "requested.parquet"
     configuration = {
         "analysis": "pretraining_drift",
+        "device": "cpu",
         "checkpoints": [
             {
                 "backbone": checkpoint.backbone,
@@ -131,6 +132,7 @@ def test_cli_json_run_matches_python_api_and_writes_only_requested_parquet(cli_s
     configuration_path = tmp_path / "compute.json"
     configuration_path.write_text(json.dumps(configuration))
     expected = analyze(
+        device="cpu",
         analysis="pretraining_drift",
         checkpoints=[checkpoint],
         originals={"tiny": original_path},
@@ -168,6 +170,7 @@ def test_cli_without_output_returns_summary_without_implicit_files(cli_study, tm
         json.dumps(
             {
                 "analysis": "spectral_fingerprints",
+                "device": "cpu",
                 "checkpoints": [
                     {
                         "backbone": checkpoint.backbone,

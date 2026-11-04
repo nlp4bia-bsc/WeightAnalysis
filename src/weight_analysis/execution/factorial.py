@@ -23,7 +23,13 @@ def _factorial(checkpoints, originals, *, layers, components, tensors, metrics, 
             _base(checkpoint, originals)
         base_path = originals[group[0].backbone]
         values = factorial(
-            group, base_path, options, layers=layers, components=components, tensors=tensors
+            group,
+            base_path,
+            options,
+            layers=layers,
+            components=components,
+            tensors=tensors,
+            device=options.device,
         )
         for row in values:
             row = {

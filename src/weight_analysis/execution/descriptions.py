@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, Mapping, Sequence
 
 import pandas as pd
+import torch
 
 from ..configuration import MetricOptions
 from ..core import (
@@ -94,7 +95,12 @@ def _describe(
                 depths = [identify(key, reader.shape_dtype(key)[0])[0] for key in aligned]
                 maximum = max((layer for layer in depths if layer is not None), default=0)
                 for key in keys:
-                    layer, component, _ = identify(key, reader.shape_dtype(key)[0])
+                    shape, _ = reader.shape_dtype(key)
+                    layer, component, _ = identify(key, shape)
+                    if not drift_names and (
+                        component not in SPECTRAL_COMPONENTS or len(shape) != 2
+                    ):
+                        continue
                     location = {
                         **_identity(checkpoint),
                         "tensor": key,
@@ -106,11 +112,17 @@ def _describe(
                     if drift_names or "delta" in sources:
                         if original is None:
                             raise ValueError("Drift/delta requires originals")
-                        final, initial, delta = get_delta(reader, original, key)
+                        final, initial, delta = get_delta(
+                            reader, original, key, device=options.device
+                        )
                     else:
-                        final = reader.get(key) if "final" in sources else None
+                        final = (
+                            reader.get(key).to(device=options.device, dtype=torch.float64)
+                            if "final" in sources
+                            else None
+                        )
                         initial = (
-                            original.get(key)
+                            original.get(key).to(device=options.device, dtype=torch.float64)
                             if original is not None and "base" in sources
                             else None
                         )

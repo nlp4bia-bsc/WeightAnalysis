@@ -14,8 +14,10 @@ import torch
 from ._validation import EPS
 
 
-def topk_overlap(a: torch.Tensor, b: torch.Tensor, fraction: float) -> dict:
+def topk_overlap(a: torch.Tensor, b: torch.Tensor, fraction: float, *, device=None) -> dict:
     """Compare stable nonzero magnitude supports and absolute-weight Jaccard."""
+    if device is not None or a.is_cuda or b.is_cuda:
+        return _device_overlap(a, b, fraction, device=device)
     if a.shape != b.shape or not 0 < fraction <= 1:
         raise ValueError("invalid top-k inputs")
     aa = a.detach().cpu().reshape(-1).abs().numpy()
@@ -61,3 +63,50 @@ def topk_overlap(a: torch.Tensor, b: torch.Tensor, fraction: float) -> dict:
         weighted_jaccard_abs=small / large if large > EPS else math.nan,
         topk_sign_agreement=sign_consistent / common if common else math.nan,
     )
+
+
+def _device_overlap(a, b, fraction, *, device=None):
+    from ._validation import tensor_pair
+
+    a, b = tensor_pair(a, b, device=device)
+    if not 0 < fraction <= 1:
+        raise ValueError("fraction must lie in (0, 1]")
+    a, b = a.reshape(-1), b.reshape(-1)
+    aa, bb = a.abs(), b.abs()
+    n = a.numel()
+    k = max(1, math.ceil(n * fraction))
+    ia, ib = _stable_support(aa, k), _stable_support(bb, k)
+    selected = torch.zeros(n, dtype=torch.bool, device=a.device)
+    selected[ia] = True
+    common_indices = ib[selected[ib]]
+    common = common_indices.numel()
+    union = ia.numel() + ib.numel() - common
+    maximum = float(torch.maximum(aa, bb).sum())
+    minimum = float(torch.minimum(aa, bb).sum())
+    consistent = int((a[common_indices].sign() == b[common_indices].sign()).sum())
+    expected = ia.numel() * ib.numel() / n
+    return dict(
+        topk_fraction=fraction,
+        topk_k=k,
+        topk_k_a=ia.numel(),
+        topk_k_b=ib.numel(),
+        topk_intersection=common,
+        topk_jaccard=common / union if union else math.nan,
+        topk_overlap_coefficient=common / min(ia.numel(), ib.numel())
+        if ia.numel() and ib.numel()
+        else math.nan,
+        topk_expected_intersection=expected,
+        topk_excess_intersection=common - expected,
+        weighted_jaccard_abs=minimum / maximum if maximum > EPS else math.nan,
+        topk_sign_agreement=consistent / common if common else math.nan,
+    )
+
+
+def _stable_support(magnitudes: torch.Tensor, count: int) -> torch.Tensor:
+    selected_count = min(count, int(torch.count_nonzero(magnitudes)))
+    if selected_count == 0:
+        return torch.empty(0, dtype=torch.long, device=magnitudes.device)
+    threshold = torch.topk(magnitudes, selected_count, sorted=False).values.min()
+    larger = torch.nonzero(magnitudes > threshold, as_tuple=False).reshape(-1)
+    ties = torch.nonzero(magnitudes == threshold, as_tuple=False).reshape(-1)
+    return torch.cat((larger, ties[: selected_count - larger.numel()]))

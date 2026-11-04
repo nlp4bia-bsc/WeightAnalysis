@@ -75,6 +75,7 @@ def test_relative_frobenius_is_independent_and_does_not_run_svd(independent_stud
     monkeypatch.setattr(spectral_module, "svds", reject_decomposition)
 
     result = analyze(
+        device="cpu",
         analysis="pretraining_drift",
         checkpoints=checkpoints[:1],
         originals=originals,
@@ -101,6 +102,7 @@ def test_final_matrix_frobenius_needs_neither_svd_nor_original_weights(
     monkeypatch.setattr(spectral_module, "svds", reject_decomposition)
 
     result = analyze(
+        device="cpu",
         analysis="spectral_fingerprints",
         checkpoints=checkpoints[:1],
         metrics=["matrix_fro"],
@@ -128,6 +130,7 @@ def test_layer_component_and_tensor_selection_happens_before_values_are_read(
 
     monkeypatch.setattr(WeightReader, "get", selected_only)
     result = analyze(
+        device="cpu",
         analysis="pretraining_drift",
         checkpoints=checkpoints[:1],
         originals=originals,
@@ -157,6 +160,7 @@ def test_checkpoint_dimension_filters_do_not_read_unselected_checkpoints(
 
     monkeypatch.setattr(WeightReader, "get", selected_only)
     result = analyze(
+        device="cpu",
         analysis="pretraining_drift",
         checkpoints=candidates,
         originals=originals,
@@ -184,6 +188,7 @@ def test_default_execution_has_no_disk_outputs(independent_study, tmp_path, monk
     before = set(tmp_path.rglob("*"))
 
     analyze(
+        device="cpu",
         analysis="pretraining_drift",
         checkpoints=checkpoints[:1],
         originals=originals,
@@ -206,13 +211,13 @@ def test_explicit_cache_resumes_without_materializing_weights(
         tensors=[QUERY],
         cache_dir=tmp_path / "cache",
     )
-    first = analyze(**arguments)
+    first = analyze(device="cpu", **arguments)
 
     def no_values(*args, **kwargs):
         raise AssertionError("A valid completed cache unit must not be recomputed")
 
     monkeypatch.setattr(WeightReader, "get", no_values)
-    resumed = analyze(**arguments)
+    resumed = analyze(device="cpu", **arguments)
 
     assert resumed.unit_id == first.unit_id
     pd.testing.assert_frame_equal(
@@ -231,13 +236,13 @@ def test_modified_checkpoint_invalidates_cached_result(independent_study, tmp_pa
         tensors=[QUERY],
         cache_dir=tmp_path / "cache",
     )
-    first = analyze(**arguments)
+    first = analyze(device="cpu", **arguments)
     path = checkpoint.path / "model.safetensors"
     tensors = load_file(path)
     tensors[QUERY] = tensors[QUERY] + 0.25
     save_file(tensors, path)
 
-    refreshed = analyze(**arguments)
+    refreshed = analyze(device="cpu", **arguments)
 
     assert refreshed.unit_id != first.unit_id
     assert refreshed.data.iloc[0].relative_frobenius > first.data.iloc[0].relative_frobenius
@@ -251,8 +256,8 @@ def test_reversed_input_order_preserves_unit_and_results(independent_study):
         metrics=["relative_frobenius"],
         tensors=[QUERY, OTHER_QUERY],
     )
-    forward = analyze(checkpoints=checkpoints, **arguments)
-    reverse = analyze(checkpoints=list(reversed(checkpoints)), **arguments)
+    forward = analyze(device="cpu", checkpoints=checkpoints, **arguments)
+    reverse = analyze(device="cpu", checkpoints=list(reversed(checkpoints)), **arguments)
 
     assert forward.unit_id == reverse.unit_id
     pd.testing.assert_frame_equal(canonical_table(forward.data), canonical_table(reverse.data))
@@ -266,9 +271,9 @@ def test_independent_subsets_merge_to_same_values_as_joint_execution(independent
         metrics=["relative_frobenius"],
         tensors=[QUERY],
     )
-    combined = analyze(checkpoints=checkpoints, **arguments)
-    left = analyze(checkpoints=checkpoints[:4], **arguments)
-    right = analyze(checkpoints=checkpoints[4:], **arguments)
+    combined = analyze(device="cpu", checkpoints=checkpoints, **arguments)
+    left = analyze(device="cpu", checkpoints=checkpoints[:4], **arguments)
+    right = analyze(device="cpu", checkpoints=checkpoints[4:], **arguments)
     merged = merge_results([left, right])
     reverse = merge_results([right, left, left])
 
@@ -283,6 +288,7 @@ def test_independent_subsets_merge_to_same_values_as_joint_execution(independent
 def test_related_comparisons_can_run_independently(independent_study, analysis):
     checkpoints, originals = independent_study
     result = analyze(
+        device="cpu",
         analysis=analysis,
         checkpoints=checkpoints,
         originals=originals,
@@ -303,6 +309,7 @@ def test_factorial_analysis_runs_independently(independent_study):
     checkpoints, originals = independent_study
     selected = [checkpoint for checkpoint in checkpoints if checkpoint.backbone == "encoder_a"]
     result = analyze(
+        device="cpu",
         analysis="language_entity_decomposition",
         checkpoints=selected,
         originals=originals,
@@ -323,7 +330,7 @@ def test_unknown_metric_or_analysis_fails_before_loading_values(independent_stud
         {"analysis": "pretraining_drift", "metrics": ["not_a_metric"]},
     ):
         with pytest.raises(ValueError):
-            analyze(checkpoints=checkpoints, originals=originals, **arguments)
+            analyze(device="cpu", checkpoints=checkpoints, originals=originals, **arguments)
 
 
 def test_cross_backbone_reuses_explicit_spectra_without_reading_tensor_values(
@@ -331,12 +338,14 @@ def test_cross_backbone_reuses_explicit_spectra_without_reading_tensor_values(
 ):
     checkpoints, _ = independent_study
     spectra = analyze(
+        device="cpu",
         analysis="spectral_fingerprints",
         checkpoints=checkpoints,
         sources=["final"],
         metrics=["matrix_fro"],
     )
     direct = analyze(
+        device="cpu",
         analysis="cross_backbone",
         checkpoints=checkpoints,
         metrics=["trace_distance_final"],
@@ -347,12 +356,14 @@ def test_cross_backbone_reuses_explicit_spectra_without_reading_tensor_values(
 
     monkeypatch.setattr(WeightReader, "get", no_values)
     reused = analyze(
+        device="cpu",
         analysis="cross_backbone",
         checkpoints=checkpoints,
         metrics=["trace_distance_final"],
         spectral_results=spectra,
     )
     reused_frame = analyze(
+        device="cpu",
         analysis="cross_backbone",
         checkpoints=checkpoints,
         metrics=["trace_distance_final"],
@@ -374,6 +385,7 @@ def test_model_centrality_consumes_explicit_pairs_and_preserves_fold_seed_strata
 ):
     checkpoints, _ = independent_study
     pairs = analyze(
+        device="cpu",
         analysis="cross_backbone",
         checkpoints=checkpoints,
         metrics=["trace_distance_final"],
@@ -384,11 +396,13 @@ def test_model_centrality_consumes_explicit_pairs_and_preserves_fold_seed_strata
 
     monkeypatch.setattr(WeightReader, "get", no_values)
     result = analyze(
+        device="cpu",
         analysis="model_centrality",
         pair_results=pairs,
         metrics=["trace_distance_final"],
     )
     reordered = analyze(
+        device="cpu",
         analysis="model_centrality",
         pair_results=pairs.data.iloc[::-1],
         metrics=["trace_distance_final"],
@@ -401,7 +415,7 @@ def test_model_centrality_consumes_explicit_pairs_and_preserves_fold_seed_strata
     assert np.allclose(result.data.mean_distance, 0, atol=1e-12)
     pd.testing.assert_frame_equal(result.data, reordered.data)
     with pytest.raises(ValueError, match="pair_results"):
-        analyze(analysis="model_centrality", metrics=["trace_distance_final"])
+        analyze(device="cpu", analysis="model_centrality", metrics=["trace_distance_final"])
 
 
 def test_partial_cache_artifacts_are_never_treated_as_completed_units(independent_study, tmp_path):
@@ -412,6 +426,7 @@ def test_partial_cache_artifacts_are_never_treated_as_completed_units(independen
     partial.write_bytes(b"incomplete parquet write")
 
     result = analyze(
+        device="cpu",
         analysis="pretraining_drift",
         checkpoints=checkpoints[:1],
         originals=originals,
@@ -431,6 +446,7 @@ def test_selected_checkpoints_do_not_require_excluded_paths(independent_study, t
     selected = checkpoints[0]
 
     result = analyze(
+        device="cpu",
         analysis="pretraining_drift",
         checkpoints=[selected, missing],
         originals=originals,

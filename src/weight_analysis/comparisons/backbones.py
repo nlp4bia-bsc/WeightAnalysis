@@ -7,12 +7,15 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
+import torch
 
 from ..core import SPECTRAL_COMPONENTS, Checkpoint
 from ..metrics import paper_trace_similarity, quantile_w1
 
 
-def _profile(df: pd.DataFrame, source: str, comp: str, column: str, grid_size: int = 16):
+def _profile(
+    df: pd.DataFrame, source: str, comp: str, column: str, grid_size: int = 16, device=None
+):
     """Interpolate depth-aligned intrinsic profiles; not neural alignment."""
     if df.empty or column not in df.columns or "status" not in df.columns:
         return None
@@ -37,6 +40,15 @@ def _profile(df: pd.DataFrame, source: str, comp: str, column: str, grid_size: i
         return None
     xs = np.array([p[0] for p in pairs])
     ys = np.stack([p[1] for p in pairs])
+    if device is not None:
+        from ..metrics.decomposition import interpolate_positions
+
+        tx = torch.as_tensor(xs, dtype=torch.float64, device=device)
+        ty = torch.as_tensor(ys, dtype=torch.float64, device=device)
+        unique = torch.unique(tx, sorted=True)
+        grouped = torch.stack([ty[tx == depth].mean(dim=0) for depth in unique])
+        axis = torch.linspace(0, 1, grid_size, device=device, dtype=torch.float64)
+        return interpolate_positions(unique, grouped, axis)
     ux = np.unique(xs)
     ys = np.stack([ys[xs == x].mean(axis=0) for x in ux])
     if len(ux) == 1:
@@ -52,6 +64,8 @@ def compare_backbones(
     spectral_df: pd.DataFrame,
     drift_df: pd.DataFrame,
     min_components: int = 3,
+    *,
+    device=None,
 ) -> dict[str, Any]:
     """B: exact-paper TRACE plus independent intrinsic fingerprint distances."""
     sa = spectral_df[spectral_df.checkpoint == a.uid]
@@ -91,7 +105,7 @@ def compare_backbones(
                 result[comp] = series.to_numpy(dtype=float)
             return result
 
-        trace = paper_trace_similarity(trace_fingerprint(sa), trace_fingerprint(sb))
+        trace = paper_trace_similarity(trace_fingerprint(sa), trace_fingerprint(sb), device=device)
         row[f"trace_similarity_{source}"] = trace["trace_similarity"]
         row[f"trace_distance_{source}"] = (
             1.0 - trace["trace_similarity"]
@@ -107,14 +121,20 @@ def compare_backbones(
         ]:
             measures = []
             for comp in SPECTRAL_COMPONENTS:
-                x = _profile(sa, source, comp, col)
-                y = _profile(sb, source, comp, col)
+                x = _profile(sa, source, comp, col, device=device)
+                y = _profile(sb, source, comp, col, device=device)
                 if x is None or y is None or x.shape != y.shape:
                     continue
                 if metric == "curve_l1":
-                    measures.append(float(np.abs(x - y).mean()))
+                    measures.append(
+                        float((x - y).abs().mean())
+                        if isinstance(x, torch.Tensor)
+                        else float(np.abs(x - y).mean())
+                    )
                 else:
-                    measures.append(float(np.mean([quantile_w1(u, v) for u, v in zip(x, y)])))
+                    measures.append(
+                        float(np.mean([quantile_w1(u, v, device=device) for u, v in zip(x, y)]))
+                    )
             row[f"{metric}_{source}"] = (
                 float(np.mean(measures)) if len(measures) >= min_components else math.nan
             )
@@ -135,6 +155,11 @@ def compare_backbones(
             )
             if not np.isfinite(x).all():
                 return None
+            if device is not None:
+                from ..metrics.decomposition import interpolate_uniform
+
+                values = torch.as_tensor(x, dtype=torch.float64, device=device)
+                return interpolate_uniform(torch.log1p(values), 16)
             return np.interp(np.linspace(0, 1, 16), np.linspace(0, 1, len(x)), np.log1p(x))
 
         x = xprofile(da)

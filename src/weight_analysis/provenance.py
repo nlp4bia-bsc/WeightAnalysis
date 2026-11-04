@@ -97,14 +97,22 @@ def computation_provenance(
         "scipy": scipy.__version__,
         "torch": torch.__version__,
         "pandas": pd.__version__,
+        "cuda_runtime": torch.version.cuda,
     }
+    execution_device = configuration.get("options", {}).get("device", "cpu")
+    if execution_device.startswith("cuda:"):
+        selected_device = torch.device(execution_device)
+        versions["cuda_device"] = {
+            "name": torch.cuda.get_device_name(selected_device),
+            "capability": list(torch.cuda.get_device_capability(selected_device)),
+        }
     payload = {
         "configuration": configuration,
         "inputs": inputs,
         "originals": base_inputs,
         "tables": table_inputs,
         "versions": versions,
-        "definitions": "selective-v1",
+        "definitions": "selective-v2-device-resident",
         "selection": selection or {},
         "intermediates": intermediates or {},
     }

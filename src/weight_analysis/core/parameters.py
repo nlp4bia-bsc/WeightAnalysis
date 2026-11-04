@@ -144,14 +144,14 @@ def audit_alignment(
 
 
 def get_delta(
-    r: WeightReader, b: WeightReader, key: str
+    r: WeightReader, b: WeightReader, key: str, *, device=None
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     """Read one aligned pair and return final, original, and delta in float64."""
     fin, ini = r.get(key), b.get(key)
     if fin.shape != ini.shape or not fin.is_floating_point() or not ini.is_floating_point():
         raise ValueError(f"Incompatible parameter {key}")
-    fin = fin.to(torch.float64)
-    ini = ini.to(torch.float64)
+    fin = fin.to(device=device or fin.device, dtype=torch.float64)
+    ini = ini.to(device=fin.device, dtype=torch.float64)
     if not torch.isfinite(fin).all() or not torch.isfinite(ini).all():
         raise ValueError(f"Nonfinite weights for {key}")
     return fin, ini, fin - ini

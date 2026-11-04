@@ -6,6 +6,7 @@ from collections import defaultdict
 
 import numpy as np
 import pandas as pd
+import torch
 
 from ..core import WeightReader, audit_alignment, identify, selected_keys
 from ..metrics import PAIR_METRICS, pair_metrics, topk_overlap
@@ -42,12 +43,10 @@ def _related(pairs, originals, *, layers, components, tensors, metrics, sources,
             )
             for key in keys:
                 layer, component, _ = identify(key, left.shape_dtype(key)[0])
-                fa = left.get(key)
-                fb = right.get(key)
+                fa = left.get(key).to(device=options.device, dtype=torch.float64)
+                fb = right.get(key).to(device=options.device, dtype=torch.float64)
                 if "delta" in sources:
-                    import torch
-
-                    initial = base.get(key).to(torch.float64)
+                    initial = base.get(key).to(device=options.device, dtype=torch.float64)
                     da, db = fa.to(torch.float64) - initial, fb.to(torch.float64) - initial
                 else:
                     da = db = None
@@ -84,10 +83,16 @@ def _related(pairs, originals, *, layers, components, tensors, metrics, sources,
                             row["subspace_status"] = "not_matrix"
                         else:
                             u = principal_basis(
-                                x, rank=options.subspace_rank, device=options.device
+                                x,
+                                rank=options.subspace_rank,
+                                device=options.device,
+                                max_exact_elements=options.max_svd_elements,
                             )
                             v = principal_basis(
-                                y, rank=options.subspace_rank, device=options.device
+                                y,
+                                rank=options.subspace_rank,
+                                device=options.device,
+                                max_exact_elements=options.max_svd_elements,
                             )
                             if u.shape[1] == 0 or v.shape[1] == 0 or u.shape[1] != v.shape[1]:
                                 row["subspace_status"] = "undefined_or_different_numerical_rank"
@@ -101,7 +106,13 @@ def _related(pairs, originals, *, layers, components, tensors, metrics, sources,
                                     "subspace_angle_mean_rad": float(angles.mean()),
                                 }
                                 row.update({name: values[name] for name in subspace_names})
-                                row["subspace_status"] = "exact_numerical_rank"
+                                row["subspace_status"] = (
+                                    "topk_approx"
+                                    if x.is_cuda
+                                    and x.numel() > options.max_svd_elements
+                                    and options.subspace_rank < min(x.shape)
+                                    else "exact_numerical_rank"
+                                )
                     rows.append(row)
     return pd.DataFrame(rows)
 
@@ -254,7 +265,9 @@ def _cross_backbone(
             raise ValueError("Drift relative_l2 must be nonnegative and finite or missing")
     rows = []
     for a, b in selected_pairs:
-        values = compare_backbones(a, b, spectral_df, drift_df, options.min_fingerprint_components)
+        values = compare_backbones(
+            a, b, spectral_df, drift_df, options.min_fingerprint_components, device=options.device
+        )
         metadata = {
             name: value
             for name, value in values.items()

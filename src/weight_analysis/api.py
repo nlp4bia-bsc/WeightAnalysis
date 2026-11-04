@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from pathlib import Path
 from typing import Mapping, Sequence
 
@@ -45,6 +45,7 @@ def analyze(
     checkpoint_ids: Sequence[str] | None = None,
     pairs: Sequence[tuple[str, str]] | None = None,
     options: MetricOptions | None = None,
+    device: str | None = None,
     cache_dir: str | Path | None = None,
     resume: bool = True,
     spectral_results: pd.DataFrame | AnalysisResult | None = None,
@@ -57,6 +58,8 @@ def analyze(
     content hashes and configuration before using a committed result. Fold and seed strata
     are never silently pooled. Legacy aggregate tables remain available through analyses
     and comparisons; this selective interface emits parameter-level observations.
+    GPU/CUDA is the default. Pass device="cpu" on hosts without CUDA. The direct
+    argument overrides options.device; unavailability never triggers CPU fallback.
     """
     if analysis not in ANALYSES:
         raise ValueError(f"Unknown analysis {analysis!r}; choose one of {ANALYSES}")
@@ -150,6 +153,11 @@ def analyze(
         raise ValueError("pairs only applies to pairwise comparisons")
     if analysis != "model_centrality" and not chosen:
         raise ValueError("No checkpoints match the requested selection")
+    from .devices import resolve_device
+
+    requested_device = device if device is not None else options.device
+    resolved_device = resolve_device(requested_device)
+    options = replace(options, device=str(resolved_device))
     base_paths = {
         key: Path(value).expanduser().resolve()
         for key, value in (originals or {}).items()

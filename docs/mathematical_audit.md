@@ -74,10 +74,16 @@ se aplican a su vectorización; para matrices coinciden con la norma de Frobeniu
    comparaciones vectoriales no llaman SVD. Esto se verifica haciendo fallar las
    operaciones prohibidas mediante monkeypatch.
 
-La API estricta calcula en float64 sobre CPU y no conserva el grafo de autograd.
+La API estricta calcula en float64 en el dispositivo seleccionado y no conserva el grafo de autograd.
 Los umbrales absolutos históricos se preservan donde hay compatibilidad; no prometen
 invariancia a escalados que crucen `1e-14`. NaN representa una cantidad indefinida,
 no cero ni evidencia de ausencia de efecto.
+
+La ampliación CUDA conserva las definiciones exactas, pero permite diferencias de redondeo
+entre dispositivos. La SVD truncada CUDA usa un range finder reproducible y permanece marcada
+como aproximada; no se atribuyen a su espectro parcial entropías ni rangos efectivos exactos.
+Las bases grandes aproximadas se identifican en sus resultados. Los detalles y las limitaciones
+de validación en hardware están en `gpu.md`.
 
 ## Validación y cobertura
 

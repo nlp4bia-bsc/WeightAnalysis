@@ -26,6 +26,32 @@ def spectral(
 ) -> dict:
     if matrix.ndim != 2 or min(matrix.shape) < 2:
         return dict(status="not_matrix")
+    if str(device).lower().startswith(("gpu", "cuda")):
+        values = spectral_metrics(
+            matrix,
+            mode=mode,
+            metrics=SPECTRAL_METRICS,
+            max_exact_elements=max_exact_elements,
+            topk=topk,
+            device=device,
+            curve_points=curve_points,
+            quantile_points=quantile_points,
+        )
+        rank = min(matrix.shape)
+        count = (
+            rank
+            if values["status"] == "exact"
+            else min(topk, rank - 1)
+            if values["status"] == "topk_approx"
+            else 0
+        )
+        return dict(
+            matrix_rows=matrix.shape[0],
+            matrix_cols=matrix.shape[1],
+            max_possible_rank=rank,
+            n_singular_computed=count,
+            **values,
+        )
     if not torch.isfinite(matrix).all():
         raise ValueError("nonfinite spectral matrix")
     r, c = matrix.shape
@@ -145,7 +171,7 @@ def spectral_metrics(
     mode: str = "exact",
     max_exact_elements: int = 3_000_000,
     topk: int = 32,
-    device: str = "cpu",
+    device: str | None = None,
     curve_points: int = 32,
     quantile_points: int = 21,
 ) -> dict:
@@ -161,13 +187,14 @@ def spectral_metrics(
     names = metric_names(metrics, SPECTRAL_METRICS)
     if mode not in ("exact", "auto", "topk", "skip"):
         raise ValueError("mode must be exact, auto, topk or skip")
-    if device not in ("cpu", "cuda"):
-        raise ValueError("device must be cpu or cuda")
     if max_exact_elements < 1 or topk < 1 or curve_points < 2 or quantile_points < 2:
         raise ValueError(
             "SVD thresholds and topk must be positive; profile grids need at least 2 points"
         )
-    matrix = floating_tensor(matrix, name="matrix")
+    matrix = floating_tensor(matrix, name="matrix", device=device)
+    device = matrix.device
+    from .decomposition import entry_quantiles, interpolate_uniform, truncated_singular_values
+
     if matrix.ndim != 2:
         raise ValueError("matrix must have exactly two dimensions")
     norm = float(torch.linalg.vector_norm(matrix))
@@ -194,9 +221,8 @@ def spectral_metrics(
     if "matrix_fro" in names:
         result["matrix_fro"] = norm
     if "normalized_weight_quantiles" in names:
-        flat = matrix.numpy().reshape(-1)
-        result["normalized_weight_quantiles"] = np.quantile(
-            flat / (norm / math.sqrt(flat.size)), np.linspace(0, 1, quantile_points)
+        result["normalized_weight_quantiles"] = entry_quantiles(
+            matrix / (norm / math.sqrt(matrix.numel())), quantile_points
         ).tolist()
     if not needs_svd:
         return result
@@ -205,41 +231,44 @@ def spectral_metrics(
             result[name] = None if name == "spectral_energy_curve" else math.nan
 
         return result
-    if device == "cuda" and not torch.cuda.is_available():
-        raise RuntimeError("CUDA requested but unavailable; use device='cpu'")
 
     rank = min(matrix.shape)
     full = mode == "exact" or (mode == "auto" and matrix.numel() <= max_exact_elements) or rank <= 2
     if full:
-        singular = torch.linalg.svdvals(matrix.to(device=device)).detach().cpu().numpy()
+        singular = torch.linalg.svdvals(matrix)
         result["status"] = "exact"
     else:
         count = min(topk, rank - 1)
-        singular = svds(
-            matrix.numpy(),
-            k=count,
-            return_singular_vectors=False,
-            v0=np.ones(rank),
-            which="LM",
-        )
+        if matrix.is_cuda:
+            singular = truncated_singular_values(matrix, count)
+        else:
+            singular = torch.from_numpy(
+                svds(
+                    matrix.numpy(),
+                    k=count,
+                    return_singular_vectors=False,
+                    v0=np.ones(rank),
+                    which="LM",
+                ).copy()
+            )
         result["status"] = "topk_approx"
-    singular = np.sort(np.maximum(singular, 0))[::-1]
-    energy = singular**2
+    singular = torch.sort(singular.clamp_min(0), descending=True).values
+    energy = singular.square()
     total_energy = norm**2
     sigma_probability = singular / singular.sum()
     energy_probability = energy / energy.sum()
     sigma_positive = sigma_probability[sigma_probability > 0]
     energy_positive = energy_probability[energy_probability > 0]
-    sigma_entropy = float(-np.sum(sigma_positive * np.log(sigma_positive)))
-    energy_entropy = float(-np.sum(energy_positive * np.log(energy_positive)))
-    cumulative = np.cumsum(energy_probability)
+    sigma_entropy = float(-(sigma_positive * sigma_positive.log()).sum())
+    energy_entropy = float(-(energy_positive * energy_positive.log()).sum())
+    cumulative = torch.cumsum(energy_probability, dim=0)
     for name in set(names) - cheap:
         if name == "spectral_norm":
             value = float(singular[0])
         elif name == "stable_rank":
             value = total_energy / float(singular[0] ** 2)
         elif name == "topk_energy_capture":
-            value = float(np.clip(energy.sum() / total_energy, 0, 1))
+            value = float((energy.sum() / total_energy).clamp(0, 1))
         elif name in ("top1_energy", "top5_energy", "top10_energy"):
             count = int(name.removeprefix("top").removesuffix("_energy"))
             value = float(energy[:count].sum() / total_energy)
@@ -258,14 +287,14 @@ def spectral_metrics(
         elif name == "spectral_entropy_energy":
             value = energy_entropy
         elif name == "spectral_energy_curve":
-            value = np.interp(
-                np.linspace(0, 1, curve_points),
-                np.linspace(0, 1, len(singular) + 1),
-                np.r_[0, cumulative],
+            value = interpolate_uniform(
+                torch.cat((cumulative.new_zeros(1), cumulative)), curve_points
             ).tolist()
         else:
             cutoff = int(name.removeprefix("rank").removesuffix("_fraction")) / 100
-            value = float((np.searchsorted(cumulative, cutoff) + 1) / rank)
+            value = float(
+                (torch.searchsorted(cumulative, cumulative.new_tensor(cutoff)) + 1) / rank
+            )
         result[name] = value
 
     return result

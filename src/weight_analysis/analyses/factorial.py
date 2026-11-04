@@ -59,6 +59,7 @@ def factorial(
     layers: Sequence[int] | None = None,
     components: Sequence[str] | None = None,
     tensors: Sequence[str] | None = None,
+    device: str | None = None,
 ) -> list[dict[str, Any]]:
     """Compute historical descriptive sums of squares on selected aligned tensors.
 
@@ -66,6 +67,9 @@ def factorial(
     tensor values. Use ``validate_factorial_design`` for strict fold/seed and
     replication validation; the historical skip policy remains unchanged here.
     """
+    from ..devices import resolve_device
+
+    compute_device = resolve_device(device or getattr(settings, "device", "cpu"))
     ls = sorted({x.language for x in checkpoints})
     es = sorted({x.entity for x in checkpoints})
     if len(ls) < 2 or len(es) < 2:
@@ -115,13 +119,23 @@ def factorial(
             # Cache ONE tensor from each checkpoint for this key. Even huge
             # embeddings are read once, not once per 30k-element slice.
             cached = {(l, e): readers[l, e].get(key).reshape(-1) for l, e in product(ls, es)}
-            ss = np.zeros(5, float)
+            totals = torch.zeros(5, dtype=torch.float64, device=compute_device)
             for start in range(0, orig.numel(), settings.factorial_chunk_elements):
                 end = min(orig.numel(), start + settings.factorial_chunk_elements)
-                w0 = orig.reshape(-1)[start:end].to(torch.float64)
+                w0 = orig.reshape(-1)[start:end].to(device=compute_device, dtype=torch.float64)
                 z = torch.stack(
                     [
-                        torch.stack([(cached[l, e][start:end].to(torch.float64) - w0) for e in es])
+                        torch.stack(
+                            [
+                                (
+                                    cached[l, e][start:end].to(
+                                        device=compute_device, dtype=torch.float64
+                                    )
+                                    - w0
+                                )
+                                for e in es
+                            ]
+                        )
                         for l in ls
                     ]
                 )
@@ -131,16 +145,16 @@ def factorial(
                 lf = z.mean(1) - mu
                 ef = z.mean(0) - mu
                 interaction = z - mu - lf[:, None, :] - ef[None, :, :]
-                ss += np.array(
-                    [
-                        len(es) * float(lf.square().sum()),
-                        len(ls) * float(ef.square().sum()),
-                        float(interaction.square().sum()),
-                        float((z - mu).square().sum()),
-                        z.shape[-1],
-                    ],
-                    float,
+                totals[:4] += torch.stack(
+                    (
+                        len(es) * lf.square().sum(),
+                        len(ls) * ef.square().sum(),
+                        interaction.square().sum(),
+                        (z - mu).square().sum(),
+                    )
                 )
+                totals[4] += z.shape[-1]
+            ss = totals.cpu().numpy()
             cached.clear()
             if not np.isclose(ss[:3].sum(), ss[3], rtol=2e-9, atol=1e-10):
                 raise ValueError(f"Factorial identity broken for {key}: {ss}")

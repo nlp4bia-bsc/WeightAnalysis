@@ -10,7 +10,7 @@ from typing import Literal
 class MetricOptions:
     """Control numerical cost and alignment without carrying experiment paths."""
 
-    device: Literal["cpu", "cuda"] = "cpu"
+    device: str = "gpu"
     spectral_mode: Literal["auto", "exact", "topk", "skip"] = "auto"
     max_svd_elements: int = 3_000_000
     topk: int = 32
@@ -22,8 +22,12 @@ class MetricOptions:
     factorial_chunk_elements: int = 30_000
 
     def __post_init__(self) -> None:
-        if self.device not in ("cpu", "cuda"):
-            raise ValueError("device must be cpu or cuda")
+        import re
+
+        if not isinstance(self.device, str) or not re.fullmatch(
+            r"cpu|(?:gpu|cuda)(?::\d+)?", self.device.lower()
+        ):
+            raise ValueError("device must be cpu, gpu, cuda, or cuda:<index>")
         if self.spectral_mode not in ("auto", "exact", "topk", "skip"):
             raise ValueError("Unknown spectral_mode")
         for name in (

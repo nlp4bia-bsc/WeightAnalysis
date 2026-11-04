@@ -63,9 +63,11 @@ def main() -> None:
             "components": ["q"],
             "metrics": ["relative_frobenius"],
         }
-        units = [analyze(checkpoints=[checkpoint], **common) for checkpoint in checkpoints]
+        units = [
+            analyze(device="cpu", checkpoints=[checkpoint], **common) for checkpoint in checkpoints
+        ]
         combined = merge_results(reversed(units))
-        joint = analyze(checkpoints=checkpoints, **common)
+        joint = analyze(device="cpu", checkpoints=checkpoints, **common)
         columns = sorted(combined.data.columns)
 
         def ordered(frame: pd.DataFrame) -> pd.DataFrame:
@@ -80,6 +82,7 @@ def main() -> None:
         pd.testing.assert_frame_equal(ordered(restored.data), ordered(combined.data))
 
         fingerprints = analyze(
+            device="cpu",
             analysis="spectral_fingerprints",
             checkpoints=checkpoints,
             originals=originals,

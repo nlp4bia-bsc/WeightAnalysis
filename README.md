@@ -1,7 +1,8 @@
 # Weight Analysis
 
 Biblioteca Python independiente para geometría de checkpoints: drift, fingerprints espectrales,
-comparaciones por idioma/entidad/backbone y descomposición factorial. Funciona en CPU y no depende
+comparaciones por idioma/entidad/backbone y descomposición factorial. Usa GPU CUDA por defecto,
+admite CPU explícita (`device="cpu"`) y no depende
 de `ner_lab`, de Picasso ni de un scheduler. Requiere Python 3.11 o posterior; las dependencias y
 extras de desarrollo, estadística y visualización están declarados en `pyproject.toml`.
 
@@ -25,6 +26,9 @@ result = analyze(
 )
 print(result.data)
 ```
+
+`device="GPU"`, `"gpu"`, `"cuda"` y `"cuda:0"` seleccionan CUDA. Requiere una GPU NVIDIA
+y PyTorch con CUDA; no hay sustitución silenciosa por CPU. [Detalles GPU](docs/gpu.md).
 
 El cálculo devuelve `AnalysisResult`; escribirlo requiere una llamada explícita a `write_result`.
 Solo `cache_dir` solicita persistencia automática. El ejemplo autocontenido

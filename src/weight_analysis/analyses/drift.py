@@ -54,6 +54,9 @@ def describe_checkpoint(
     compute_spectra: bool = True,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """A1: compute delta drift; build separate spectral fingerprints for base/final/delta."""
+    from ..devices import resolve_device
+
+    compute_device = resolve_device(getattr(settings, "device", "cpu"))
     drift_rows = []
     spectra = []
     aggregate = defaultdict(lambda: dict(n=0, ds=0.0, bs=0.0, fs=0.0, dot=0.0, l1=0.0, maximum=0.0))
@@ -83,7 +86,7 @@ def describe_checkpoint(
             )
         maxlayer = max((z for z in layers if z is not None), default=0)
         for key in keys:
-            fin, orig, d = get_delta(r, b, key)
+            fin, orig, d = get_delta(r, b, key, device=compute_device)
             layer, comp, _ = identify(key, tuple(fin.shape))
             loc = dict(
                 **common(cp),

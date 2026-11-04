@@ -34,6 +34,9 @@ def compare_related(
     a: Checkpoint, b: Checkpoint, base_path: Path, settings: Any, subspace_cache: dict | None = None
 ) -> list[dict[str, Any]]:
     """A2-A4: pair aligned deltas + raw final weights (separate comparison_kind)."""
+    from ..devices import resolve_device
+
+    compute_device = resolve_device(getattr(settings, "device", "cpu"))
     rows = []
     aggregators = defaultdict(VectorAccumulator)
     # Scores per layer/component for Chen et al. (COLM 2026), Eq. 8, Alg A2.
@@ -71,8 +74,8 @@ def compare_related(
             pair_element_coverage=fraction,
         )
         for key in matching:
-            fa, ini, da = get_delta(ra, original, key)
-            fb, ini2, db = get_delta(rb, original, key)
+            fa, ini, da = get_delta(ra, original, key, device=compute_device)
+            fb, ini2, db = get_delta(rb, original, key, device=compute_device)
             if not torch.equal(ini, ini2):
                 raise ValueError("Base tensor changed between pair reads")
             layer, comp, _ = identify(key, tuple(fa.shape))

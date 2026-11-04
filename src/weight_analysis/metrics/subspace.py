@@ -21,6 +21,21 @@ def basis(
     """Return the historical requested-rank singular basis and approximation status."""
     if matrix.ndim != 2 or min(matrix.shape) < 2:
         return None, "not_matrix"
+    if str(device).lower().startswith(("gpu", "cuda")):
+        from ..devices import resolve_device
+        from ._validation import floating_tensor
+        from .decomposition import truncated_left_basis
+
+        matrix = floating_tensor(matrix, name="matrix", device=resolve_device(device))
+        if float(torch.linalg.vector_norm(matrix)) <= EPS:
+            return None, "zero_matrix"
+        k = min(rank, min(matrix.shape))
+        if k < 1:
+            return None, "disabled"
+        if matrix.numel() <= max_exact_elements or k == min(matrix.shape):
+            return torch.linalg.svd(matrix, full_matrices=False).U[:, :k], "exact_svd"
+        left, _ = truncated_left_basis(matrix, k)
+        return left, "topk_approx"
     if not torch.isfinite(matrix).all():
         raise ValueError("nonfinite subspace matrix")
     if float(torch.linalg.vector_norm(matrix)) <= EPS:
@@ -101,34 +116,47 @@ def principal_basis(
     *,
     rank: int,
     relative_tolerance: float | None = None,
-    device: str = "cpu",
+    device: str | None = None,
+    max_exact_elements: int | None = None,
 ) -> torch.Tensor:
-    """Return an exact left-singular basis restricted to numerical column rank.
+    """Return a left-singular basis restricted to detected nonzero singular directions.
 
     This strict API never fills requested directions with singular vectors of
     the null space. A zero matrix has no nonzero column-space directions and
     produces an empty basis. Historical fixed-rank behavior remains in basis.
+    With max_exact_elements, large CUDA matrices use a seeded approximate range finder;
+    otherwise the decomposition is exact. The returned basis stays on the chosen device.
     """
+    from ..devices import resolve_device
     from ._validation import floating_tensor
 
-    matrix = floating_tensor(matrix, name="matrix")
-    if device not in ("cpu", "cuda"):
-        raise ValueError("device must be cpu or cuda")
-    if device == "cuda" and not torch.cuda.is_available():
-        raise RuntimeError("CUDA requested but unavailable; use device='cpu'")
+    device = resolve_device(device) if device is not None else matrix.device
+    matrix = floating_tensor(matrix, name="matrix", device=device)
     if matrix.ndim != 2 or rank < 1:
         raise ValueError("matrix must be 2D and rank must be positive")
     if relative_tolerance is not None and (
         not math.isfinite(relative_tolerance) or relative_tolerance < 0
     ):
         raise ValueError("relative_tolerance must be finite and nonnegative")
-    left, singular, _ = torch.linalg.svd(matrix.to(device=device), full_matrices=False)
+    if max_exact_elements is not None and max_exact_elements < 1:
+        raise ValueError("max_exact_elements must be positive")
+    if (
+        matrix.is_cuda
+        and max_exact_elements is not None
+        and matrix.numel() > max_exact_elements
+        and rank < min(matrix.shape)
+    ):
+        from .decomposition import truncated_left_basis
+
+        left, singular = truncated_left_basis(matrix, rank)
+    else:
+        left, singular, _ = torch.linalg.svd(matrix, full_matrices=False)
     tolerance = relative_tolerance
     if tolerance is None:
         tolerance = max(matrix.shape) * torch.finfo(matrix.dtype).eps
     retained = min(rank, int((singular > singular[0] * tolerance).sum()))
 
-    return left[:, :retained].detach().cpu()
+    return left[:, :retained].detach()
 
 
 def principal_angles(a: torch.Tensor, b: torch.Tensor) -> torch.Tensor:

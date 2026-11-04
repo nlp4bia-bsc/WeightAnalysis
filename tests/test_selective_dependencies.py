@@ -69,6 +69,7 @@ def test_cross_backbone_only_reads_explicit_pair_endpoints(selective_study, monk
 
     monkeypatch.setattr(WeightReader, "__enter__", record_enter)
     result = analyze(
+        device="cpu",
         analysis="cross_backbone",
         checkpoints=checkpoints,
         originals=originals,
@@ -100,6 +101,7 @@ def test_cross_backbone_does_not_cross_product_metric_source_dependencies(
 
     monkeypatch.setattr(torch.linalg, "svdvals", forbidden_svd)
     result = analyze(
+        device="cpu",
         analysis="cross_backbone",
         checkpoints=selected,
         originals=originals,
@@ -124,7 +126,12 @@ def test_factorial_checks_configuration_of_every_cell(selective_study):
     config["num_hidden_layers"] = 99
     path.write_text(json.dumps(config))
     with pytest.raises(ValueError, match="num_hidden_layers mismatch"):
-        analyze(analysis="language_entity_decomposition", checkpoints=group, originals=originals)
+        analyze(
+            device="cpu",
+            analysis="language_entity_decomposition",
+            checkpoints=group,
+            originals=originals,
+        )
 
 
 @pytest.mark.parametrize("invalid", ["missing_column", "duplicate", "missing_source", "negative"])
@@ -132,6 +139,7 @@ def test_cross_backbone_rejects_invalid_spectral_intermediates(selective_study, 
     checkpoints, originals = selective_study
     selected = selected_pair(checkpoints)
     table = analyze(
+        device="cpu",
         analysis="spectral_fingerprints",
         checkpoints=selected,
         metrics=["matrix_fro"],
@@ -151,6 +159,7 @@ def test_cross_backbone_rejects_invalid_spectral_intermediates(selective_study, 
         match = "nonnegative"
     with pytest.raises(ValueError, match=match):
         analyze(
+            device="cpu",
             analysis="cross_backbone",
             checkpoints=selected,
             originals=originals,
@@ -163,6 +172,7 @@ def test_cross_backbone_rejects_invalid_quantile_profile(selective_study):
     checkpoints, _ = selective_study
     selected = selected_pair(checkpoints)
     table = analyze(
+        device="cpu",
         analysis="spectral_fingerprints",
         checkpoints=selected,
         metrics=["normalized_weight_quantiles"],
@@ -171,6 +181,7 @@ def test_cross_backbone_rejects_invalid_quantile_profile(selective_study):
     table.at[0, "normalized_weight_quantiles"] = [2.0, 1.0]
     with pytest.raises(ValueError, match="nondecreasing"):
         analyze(
+            device="cpu",
             analysis="cross_backbone",
             checkpoints=selected,
             metrics=["quantile_w1_final"],

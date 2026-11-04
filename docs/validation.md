@@ -75,6 +75,16 @@ float64 exacta y equivalencia entre unidades disjuntas y cálculo conjunto. El C
 usa la API real desde un directorio temporal; listar análisis no importa torch.
 La visualización utiliza Agg y resultados ya calculados, sin recomputar pesos.
 
+## Ampliación CUDA
+
+La API solicita GPU por defecto; las fixtures CPU y el ejemplo portátil ahora pasan
+`device="cpu"` explícitamente. Tras ampliar las rutas de cálculo, el flujo independiente dio
+**246 passed, 18 skipped** en este entorno CPU: nueve omisiones son los oráculos previos y
+nueve son pruebas de ejecución CUDA real sin hardware disponible. Los tests CPU contrastan
+además alias/índices, error sin fallback, interpolación, cuantiles, overlap y el algoritmo
+truncado contra una SVD exacta, sin modificar el RNG global. La velocidad y la equivalencia en
+hardware CUDA siguen pendientes de ejecutar esas pruebas en destino; véase `gpu.md`.
+
 ## Reproducción
 
 Instalación de desarrollo sin GPU, con un Python compatible:

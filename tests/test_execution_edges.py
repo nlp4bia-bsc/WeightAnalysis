@@ -42,6 +42,7 @@ def test_final_comparison_never_materializes_original(pair_study, monkeypatch):
 
     monkeypatch.setattr(WeightReader, "get", final_only)
     result = analyze(
+        device="cpu",
         analysis="cross_language",
         checkpoints=checkpoints,
         originals=originals,
@@ -55,6 +56,7 @@ def test_pair_selection_excludes_unmounted_checkpoint_before_fingerprinting(pair
     checkpoints, originals = pair_study
     unused = CheckpointSpec("bert", "fr", "disease", tmp_path / "not-mounted")
     result = analyze(
+        device="cpu",
         analysis="cross_language",
         checkpoints=[*checkpoints, unused],
         originals=originals,
@@ -91,7 +93,7 @@ def test_historical_centrality_does_not_revalidate_live_checkpoints(monkeypatch)
             "originals": {"a": {"path": "/not-mounted", "files": {}}},
         },
     )
-    result = analyze(analysis="model_centrality", pair_results=historical)
+    result = analyze(device="cpu", analysis="model_centrality", pair_results=historical)
     assert result.data.mean_distance.tolist() == [0.5, 0.5]
     assert result.provenance["intermediates"]["pairs"]["provenance"] == historical.provenance
 

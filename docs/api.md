@@ -99,7 +99,10 @@ profile = spectral_metrics(final, metrics=["matrix_fro"], mode="exact")
 ```
 
 `MetricOptions` controla dispositivo, modo/rango de SVD, umbral exacto, rango de subespacio,
-top-k, umbral de signo, cobertura mínima y tamaño de fragmentos factoriales. El default es CPU.
+top-k, umbral de signo, cobertura mínima y tamaño de fragmentos factoriales. El default es GPU.
+`analyze(device="gpu")` selecciona CUDA; `device="cpu"` conserva la ejecución en CPU.
+El argumento directo tiene prioridad sobre `options.device`. Los alias `GPU`, `gpu`, `cuda`
+y sus índices se normalizan al dispositivo efectivo, registrado en la procedencia.
 Solicitar CUDA no debe producir una sustitución silenciosa por CPU. La versión actual requiere
 valores positivos para los rangos; la selección de métricas evita el cálculo no requerido.
 
@@ -163,6 +166,10 @@ En este ejemplo `spanish` y `english` son declaraciones del mismo backbone, enti
 semilla, con idiomas distintos. Una petición posterior con los mismos contenidos y opciones
 puede reutilizar la unidad validada. Cambiar los pesos, el `config.json` o la definición numérica
 identifica otra unidad.
+
+La ejecución en GPU, los límites de memoria y la validación disponible se describen en
+[GPU](gpu.md). Las funciones atómicas conservan el dispositivo de sus tensores si no se pasa
+`device`; la API de análisis es la que solicita GPU por defecto.
 
 ## Interpretación y compatibilidad
 

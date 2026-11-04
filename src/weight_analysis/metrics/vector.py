@@ -149,6 +149,7 @@ def drift_metrics(
     base: torch.Tensor,
     *,
     metrics: tuple[str, ...] | list[str] = ("relative_frobenius",),
+    device=None,
 ) -> dict[str, float]:
     """Compute only requested drift statistics on a shared parameter tensor.
 
@@ -159,7 +160,11 @@ def drift_metrics(
     from ._validation import metric_names, tensor_pair
 
     names = metric_names(metrics, DRIFT_METRICS)
-    final, base = tensor_pair(final, base)
+    final, base = tensor_pair(final, base, device=device)
+    if final.is_cuda:
+        from .device_vectors import drift_on_device
+
+        return drift_on_device(final, base, names)
     final, base = final.reshape(-1), base.reshape(-1)
     delta = final - base
     norms: dict[str, float] = {}
@@ -206,9 +211,9 @@ def drift_metrics(
     return result
 
 
-def relative_frobenius(final: torch.Tensor, base: torch.Tensor) -> float:
+def relative_frobenius(final: torch.Tensor, base: torch.Tensor, *, device=None) -> float:
     """Return ||final-base||_F / ||base||_F without any spectral computation."""
-    return drift_metrics(final, base)["relative_frobenius"]
+    return drift_metrics(final, base, device=device)["relative_frobenius"]
 
 
 def pair_metrics(
@@ -217,6 +222,7 @@ def pair_metrics(
     *,
     metrics: tuple[str, ...] | list[str] = ("cosine",),
     sign_floor: float = 1e-8,
+    device=None,
 ) -> dict[str, float]:
     """Compare aligned vectors with only the requested distance or similarity.
 
@@ -229,7 +235,11 @@ def pair_metrics(
     names = metric_names(metrics, PAIR_METRICS)
     if not math.isfinite(sign_floor) or sign_floor < 0:
         raise ValueError("sign_floor must be finite and nonnegative")
-    a, b = tensor_pair(a, b)
+    a, b = tensor_pair(a, b, device=device)
+    if a.is_cuda:
+        from .device_vectors import pairs_on_device
+
+        return pairs_on_device(a, b, names, sign_floor)
     a, b = a.reshape(-1), b.reshape(-1)
     result = {}
     cache: dict[str, float] = {}

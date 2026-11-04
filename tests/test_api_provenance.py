@@ -97,10 +97,10 @@ def test_numerical_definition_version_invalidates_unit(provenance_study, monkeyp
         originals=originals,
         metrics=["delta_l2"],
     )
-    first = analyze(**arguments)
+    first = analyze(device="cpu", **arguments)
     provenance_module = importlib.import_module("weight_analysis.provenance")
     monkeypatch.setattr(provenance_module, "__version__", "999.0.0-test")
-    refreshed = analyze(**arguments)
+    refreshed = analyze(device="cpu", **arguments)
     assert first.unit_id != refreshed.unit_id
 
 
@@ -113,12 +113,12 @@ def test_modified_original_content_invalidates_cache(provenance_study, tmp_path)
         metrics=["delta_l2"],
         cache_dir=tmp_path / "cache",
     )
-    first = analyze(**arguments)
+    first = analyze(device="cpu", **arguments)
     path = originals["a"] / "model.safetensors"
     tensors = load_file(path)
     tensors[next(iter(tensors))] += 0.125
     save_file(tensors, path)
-    refreshed = analyze(**arguments)
+    refreshed = analyze(device="cpu", **arguments)
     assert first.unit_id != refreshed.unit_id
     assert refreshed.data.delta_l2.sum() > first.data.delta_l2.sum()
 
@@ -131,12 +131,12 @@ def test_model_configuration_invalidates_unit(provenance_study):
         originals=originals,
         metrics=["delta_l2"],
     )
-    first = analyze(**arguments)
+    first = analyze(device="cpu", **arguments)
     path = checkpoints[0].path / "config.json"
     config = json.loads(path.read_text())
     config["architectures"] = ["BertForTokenClassification"]
     path.write_text(json.dumps(config))
-    assert analyze(**arguments).unit_id != first.unit_id
+    assert analyze(device="cpu", **arguments).unit_id != first.unit_id
 
 
 def test_interrupted_cache_write_can_be_retried(provenance_study, tmp_path, monkeypatch):
@@ -158,12 +158,12 @@ def test_interrupted_cache_write_can_be_retried(provenance_study, tmp_path, monk
 
     monkeypatch.setattr(storage.os, "replace", interrupt)
     with pytest.raises(OSError, match="interrupted cache commit"):
-        analyze(**arguments)
+        analyze(device="cpu", **arguments)
     assert not list(cache_dir.iterdir())
     monkeypatch.setattr(storage.os, "replace", original_replace)
-    completed = analyze(**arguments)
+    completed = analyze(device="cpu", **arguments)
     assert (cache_dir / f"{completed.unit_id}.parquet").is_file()
-    assert analyze(**arguments).unit_id == completed.unit_id
+    assert analyze(device="cpu", **arguments).unit_id == completed.unit_id
 
 
 def test_corrupt_committed_cache_is_rejected(provenance_study, tmp_path):
@@ -176,11 +176,11 @@ def test_corrupt_committed_cache_is_rejected(provenance_study, tmp_path):
         metrics=["delta_l2"],
         cache_dir=cache_dir,
     )
-    completed = analyze(**arguments)
+    completed = analyze(device="cpu", **arguments)
     path = cache_dir / f"{completed.unit_id}.parquet"
     path.write_bytes(b"interrupted or corrupt parquet")
     with pytest.raises((ValueError, OSError)):
-        analyze(**arguments)
+        analyze(device="cpu", **arguments)
 
 
 def test_explicit_pair_order_does_not_change_identity(provenance_study):
@@ -189,8 +189,8 @@ def test_explicit_pair_order_does_not_change_identity(provenance_study):
     arguments = dict(
         analysis="cross_backbone", checkpoints=checkpoints, metrics=["trace_distance_final"]
     )
-    forward = analyze(pairs=[pair], **arguments)
-    reverse = analyze(pairs=[tuple(reversed(pair))], **arguments)
+    forward = analyze(device="cpu", pairs=[pair], **arguments)
+    reverse = analyze(device="cpu", pairs=[tuple(reversed(pair))], **arguments)
     assert forward.unit_id == reverse.unit_id
     pd.testing.assert_frame_equal(forward.data, reverse.data)
 
@@ -198,6 +198,7 @@ def test_explicit_pair_order_does_not_change_identity(provenance_study):
 def test_precomputed_spectra_respect_layer_selection(provenance_study):
     checkpoints, _ = provenance_study
     full = analyze(
+        device="cpu",
         analysis="spectral_fingerprints",
         checkpoints=checkpoints,
         metrics=["matrix_fro"],
@@ -209,8 +210,8 @@ def test_precomputed_spectra_respect_layer_selection(provenance_study):
         metrics=["trace_distance_final"],
         layers=[0, 1],
     )
-    direct = analyze(**arguments)
-    precomputed = analyze(spectral_results=full, **arguments)
+    direct = analyze(device="cpu", **arguments)
+    precomputed = analyze(device="cpu", spectral_results=full, **arguments)
     assert direct.data.iloc[0].trace_distance_final == pytest.approx(0.0, abs=1e-12)
     assert precomputed.data.iloc[0].trace_distance_final == pytest.approx(
         direct.data.iloc[0].trace_distance_final, abs=1e-12
@@ -221,8 +222,8 @@ def test_centrality_filters_explicit_intermediate_table_by_study_dimensions():
     arguments = dict(
         analysis="model_centrality", pair_results=pair_table(), metrics=["trace_distance_delta"]
     )
-    spanish = analyze(languages=["es"], folds=[1], seeds=[13], **arguments)
-    italian = analyze(languages=["it"], folds=[2], seeds=[42], **arguments)
+    spanish = analyze(device="cpu", languages=["es"], folds=[1], seeds=[13], **arguments)
+    italian = analyze(device="cpu", languages=["it"], folds=[2], seeds=[42], **arguments)
     assert set(spanish.data.language) == {"es"}
     assert set(italian.data.language) == {"it"}
     assert spanish.unit_id != italian.unit_id
@@ -233,6 +234,7 @@ def test_centrality_filters_explicit_intermediate_table_by_study_dimensions():
 def test_precomputed_results_reject_changed_checkpoint_content(provenance_study):
     checkpoints, _ = provenance_study
     spectra = analyze(
+        device="cpu",
         analysis="spectral_fingerprints",
         checkpoints=checkpoints,
         metrics=["matrix_fro"],
@@ -244,6 +246,7 @@ def test_precomputed_results_reject_changed_checkpoint_content(provenance_study)
     save_file(tensors, path)
     with pytest.raises(ValueError, match="(?i)(stale|provenance|fingerprint|content)"):
         analyze(
+            device="cpu",
             analysis="cross_backbone",
             checkpoints=checkpoints,
             metrics=["trace_distance_final"],
@@ -262,7 +265,7 @@ def test_cache_metadata_must_match_requested_computation(provenance_study, tmp_p
         metrics=["delta_l2"],
         cache_dir=cache_dir,
     )
-    completed = analyze(**arguments)
+    completed = analyze(device="cpu", **arguments)
     analysis = "other_analysis" if mismatch == "analysis" else completed.analysis
     provenance = dict(completed.provenance)
     if mismatch == "configuration":
@@ -270,7 +273,7 @@ def test_cache_metadata_must_match_requested_computation(provenance_study, tmp_p
     altered = AnalysisResult(analysis, completed.data, provenance)
     write_result(altered, cache_dir / f"{completed.unit_id}.parquet")
     with pytest.raises(ValueError, match="(?i)(cache|match|provenance)"):
-        analyze(**arguments)
+        analyze(device="cpu", **arguments)
 
 
 def test_independent_layer_shards_preserve_definition_and_merge_joint_result(provenance_study):
@@ -281,9 +284,9 @@ def test_independent_layer_shards_preserve_definition_and_merge_joint_result(pro
         originals=originals,
         metrics=["delta_l2"],
     )
-    combined = analyze(**arguments)
-    first = analyze(layers=[0], **arguments)
-    remaining = analyze(layers=[1, 2], **arguments)
+    combined = analyze(device="cpu", **arguments)
+    first = analyze(device="cpu", layers=[0], **arguments)
+    remaining = analyze(device="cpu", layers=[1, 2], **arguments)
     assert first.provenance["configuration"] == remaining.provenance["configuration"]
     assert first.provenance["selection"] != remaining.provenance["selection"]
     assert first.unit_id != remaining.unit_id
@@ -299,8 +302,8 @@ def test_overlapping_layer_shards_can_be_detected_before_aggregation(provenance_
         originals=originals,
         metrics=["delta_l2"],
     )
-    first = analyze(layers=[0, 1], **arguments)
-    overlap = analyze(layers=[1, 2], **arguments)
+    first = analyze(device="cpu", layers=[0, 1], **arguments)
+    overlap = analyze(device="cpu", layers=[1, 2], **arguments)
     with pytest.raises(ValueError, match="Overlapping observations"):
         merge_results([first, overlap], observation_keys=["checkpoint", "tensor", "level"])
 
@@ -322,6 +325,7 @@ def test_precomputed_spectra_reject_conflicting_declared_original(
 ):
     checkpoints, originals = provenance_study
     spectra = analyze(
+        device="cpu",
         analysis="spectral_fingerprints",
         checkpoints=checkpoints,
         originals=originals,
@@ -331,6 +335,7 @@ def test_precomputed_spectra_reject_conflicting_declared_original(
     replacements = alternate_originals(originals, tmp_path, change_content=True)
     with pytest.raises(ValueError, match="(?i)(original|provenance|fingerprint|content)"):
         analyze(
+            device="cpu",
             analysis="cross_backbone",
             checkpoints=checkpoints,
             originals=replacements,
@@ -342,6 +347,7 @@ def test_precomputed_spectra_reject_conflicting_declared_original(
 def test_precomputed_drift_rejects_conflicting_declared_original(provenance_study, tmp_path):
     checkpoints, originals = provenance_study
     drift = analyze(
+        device="cpu",
         analysis="pretraining_drift",
         checkpoints=checkpoints,
         originals=originals,
@@ -350,6 +356,7 @@ def test_precomputed_drift_rejects_conflicting_declared_original(provenance_stud
     replacements = alternate_originals(originals, tmp_path, change_content=True)
     with pytest.raises(ValueError, match="(?i)(original|provenance|fingerprint|content)"):
         analyze(
+            device="cpu",
             analysis="cross_backbone",
             checkpoints=checkpoints,
             originals=replacements,
@@ -362,6 +369,7 @@ def test_precomputed_drift_rejects_conflicting_declared_original(provenance_stud
 def test_precomputed_spectra_allow_relocated_identical_original(provenance_study, tmp_path, source):
     checkpoints, originals = provenance_study
     spectra = analyze(
+        device="cpu",
         analysis="spectral_fingerprints",
         checkpoints=checkpoints,
         originals=originals,
@@ -376,6 +384,6 @@ def test_precomputed_spectra_allow_relocated_identical_original(provenance_study
         metrics=[f"trace_distance_{source}"],
         options=MetricOptions(min_fingerprint_components=1),
     )
-    reused = analyze(spectral_results=spectra, **arguments)
-    direct = analyze(**arguments)
+    reused = analyze(device="cpu", spectral_results=spectra, **arguments)
+    direct = analyze(device="cpu", **arguments)
     pd.testing.assert_frame_equal(reused.data, direct.data)
