@@ -1,0 +1,23 @@
+INFO:    Could not find any nv files on this host!
+15:4: not a valid test operator:  
+15:4: not a valid test operator: 13.0
+21:4: not a valid test operator: (
+21:4: not a valid test operator: 
+
+=== CORRELACIONES POR PROFUNDIDAD ===
+                                        median  count  <lambda_0>
+level           depth_zone metric                                
+layer           inferior   delta_rms   -0.2524     21          21
+                           relative_l2 -0.5437     21          21
+                media      delta_rms   -0.1909     21          19
+                           relative_l2 -0.4263     21          21
+                superior   delta_rms   -0.1214     21          18
+                           relative_l2 -0.3195     21          21
+layer_component inferior   delta_rms   -0.2163     21          21
+                           relative_l2 -0.5370     21          21
+                media      delta_rms   -0.1237     21          18
+                           relative_l2 -0.4234     21          21
+                superior   delta_rms   -0.1078     21          14
+                           relative_l2 -0.3394     21          21
+
+Resultados guardados.
