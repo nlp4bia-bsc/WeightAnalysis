@@ -1,0 +1,45 @@
+# Weight Analysis
+
+Biblioteca Python independiente para geometría de checkpoints: drift, fingerprints espectrales,
+comparaciones por idioma/entidad/backbone y descomposición factorial. Funciona en CPU y no depende
+de `ner_lab`, de Picasso ni de un scheduler. Requiere Python 3.11 o posterior; las dependencias y
+extras de desarrollo, estadística y visualización están declarados en `pyproject.toml`.
+
+## Uso
+
+Con la distribución instalada, cada análisis se invoca por separado. Las rutas son explícitas;
+no se descargan modelos ni se ejecuta inferencia:
+
+```python
+from weight_analysis import CheckpointSpec, analyze
+
+checkpoint = CheckpointSpec(
+    backbone="encoder", language="es", entity="disease",
+    path="/datos/entrenado", fold=1, seed=42,
+)
+result = analyze(
+    analysis="pretraining_drift",
+    checkpoints=[checkpoint],
+    originals={"encoder": "/datos/original"},
+    layers=[0], components=["q"], metrics=["relative_frobenius"],
+)
+print(result.data)
+```
+
+El cálculo devuelve `AnalysisResult`; escribirlo requiere una llamada explícita a `write_result`.
+Solo `cache_dir` solicita persistencia automática. El ejemplo autocontenido
+[`examples/independent_analysis.py`](examples/independent_analysis.py) genera pesos sintéticos,
+calcula unidades independientes y las agrega, sin checkpoints grandes ni red.
+
+## Guías
+
+- [API, catálogo y ejecución independiente](docs/api.md).
+- [Auditoría matemática y limitaciones](docs/mathematical_audit.md).
+- [Referencia arquitectónica verificada de ner_lab y prioridades P0–P3](docs/architecture_reference.md).
+- [Plan de integración futura](docs/integration_plan.md).
+- [Instalación, pruebas ejecutadas y limitaciones conocidas](docs/validation.md).
+
+Las rutas históricas `weightspace` se mantienen para reproducibilidad. La API nueva es
+`weight_analysis`; no añade infraestructura SLURM. Las pruebas pytest usan fixtures CPU y oráculos
+independientes. El paper objetivo y los datos reales no se han suministrado: las verificaciones
+matemáticas no equivalen a confirmar hipótesis empíricas ni reproducir resultados del estudio.

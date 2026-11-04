@@ -1,0 +1,18 @@
+# Trabajo en Weight Analysis
+
+- Mantener `weight_analysis` independiente de `ner_lab`; la referencia arquitectónica y su SHA
+  están en `docs/architecture_reference.md`. No integrar ni copiar código de ner_lab.
+- No crear `.sh`, `.sbatch`, scheduling, colas ni infraestructura SLURM. Las unidades de cálculo
+  se ejecutan mediante Python y se distribuyen externamente.
+- Preservar definiciones y compatibilidad histórica. Obtener baseline y regresiones antes de
+  cambiar fórmulas; justificar cambios en la auditoría y conservar identificaciones históricas.
+- Separar contratos/lectura, métricas, análisis, comparación, estadística, resultados y visualización.
+  Los filtros se aplican antes de materializar tensores. Una métrica no debe disparar otras costosas.
+- Usar argumentos explícitos, tipos modernos y configuración de una sola responsabilidad.
+  El cálculo devuelve objetos; I/O, caché y logging global deben ser decisiones explícitas.
+- Para verificar, ejecutar pytest desde el repositorio con el paquete instalado. Las pruebas
+  obligatorias usan CPU y fixtures sintéticas; distinguir fallos, errores, omisiones y pruebas
+  no ejecutadas. No ocultar fallos previos de scripts ausentes ni inventar sustitutos.
+- No afirmar confirmación del paper sin paper, hipótesis y datos. Pares dependientes no son
+  réplicas independientes; no atribuir una media de F1 entre folds a un único checkpoint.
+- Mantener README y AGENTS breves; detalles científicos y contratos públicos pertenecen a `docs/`.
