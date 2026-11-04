@@ -114,3 +114,35 @@ por sí sola que el original declarado sea el usado durante el entrenamiento.
 
 Las conclusiones empíricas y la equivalencia con resultados reales siguen pendientes:
 no se han suministrado el paper objetivo, sus hipótesis, los checkpoints ni las tablas F1.
+
+## Extensión de geometría comparativa fina
+
+La extensión añade pruebas independientes en `tests/test_comparative_extension.py`:
+selección determinista por F1 y empates, ámbito checkpoint/agregado, política explícita de cruce,
+bloques de coordenadas, energías/cosenos/Pearson históricos, centroides, proyecciones,
+residuos, dispersión y LOO con oráculos NumPy no collineales. Se comprueban invariancia al
+origen, referencias alternativas, evidencia de vocabulario, reubicación de checkpoints,
+equivalencia de fragmentos de pares/capas/métricas, particiones Parquet y digest, reanudación,
+caché corrupta, dependencia espectral reutilizada, incidencias, prints y fallos del log.
+Las figuras se contrastan con Agg y rechazan agregaciones implícitas. Las asociaciones F1
+registran checkpoints/scores compartidos sin valores p iid.
+
+Se corrigió la reducción del perfil de adaptación cuando recibe un dispositivo explícito:
+la rama tensorial usa PyTorch en su dispositivo en lugar de pasar por NumPy. Una regresión
+independiente contrasta tanto la rama histórica como la nueva con la misma fórmula NumPy.
+No se cambiaron definiciones matemáticas históricas. El lector Parquet lee el archivo concreto
+para impedir que Arrow infiera columnas extra de los directorios Hive de partición.
+
+La suite independiente final dio **283 passed, 79 skipped** con PyTorch CPU en este entorno;
+las omisiones son nueve oráculos externos y 70 casos CUDA sin hardware. De estos últimos,
+cuatro cubren las nuevas rutas directa/intrínseca y grupos por entidad/idioma, con comparación
+CPU/CUDA de resultados detallados y agregados. No se afirma haber probado kernels o velocidad
+en una GPU real. Los fallos históricos del módulo SLURM descritos arriba siguen pendientes y
+ese módulo se excluyó explícitamente de este recuento; no se han creado scripts para resolverlo.
+
+Ruff sobre `src/`, el test nuevo y el ejemplo nuevo, `pip check` y build de sdist/wheel pasan.
+Una ejecución de Ruff sobre todos los tests históricos también señala 23 incidencias de estilo
+previas; no se han reformateado ni alterado esos tests como parte de la extensión.
+El ejemplo `python examples/comparative_geometry.py` completa cálculo, reunión, agregación y
+lectura/escritura Parquet sin red. La guía matemática, esquemas y límites están en
+[comparative_geometry.md](comparative_geometry.md).

@@ -1,8 +1,30 @@
+from .analyses.shared_adaptation import analyze_shared_adaptation as analyze_shared_adaptation
 from .api import analyze as analyze
+from .comparisons.performance import compare_selected as compare_selected
+from .comparisons.selection import SelectionResult as SelectionResult
+from .comparisons.selection import select_axis_pairs as select_axis_pairs
+from .comparisons.selection import select_performance_pairs as select_performance_pairs
 from .core import CheckpointSpec as CheckpointSpec
+from .core.catalog import CatalogEntry as CatalogEntry
+from .core.catalog import CheckpointCatalog as CheckpointCatalog
+from .core.catalog import CheckpointEvidence as CheckpointEvidence
+from .core.catalog import ReferenceSpec as ReferenceSpec
+from .core.catalog import build_catalog as build_catalog
+from .core.catalog import input_digest as input_digest
+from .core.geometry_schema import ParameterSelection as ParameterSelection
+from .core.reporting import RunReporter as RunReporter
 from .results import AnalysisResult as AnalysisResult
 from .results import merge_results as merge_results
 from .results import read_result as read_result
 from .results import write_result as write_result
+from .results.comparative import ComparativeResult as ComparativeResult
+from .results.comparative import merge_comparative as merge_comparative
+from .results.comparative import read_dataset as read_dataset
+from .results.comparative import write_dataset as write_dataset
+from .statistics.aggregation import aggregate_geometry as aggregate_geometry
+from .statistics.comparative import associate_f1 as associate_f1
+from .statistics.comparative import associate_member_f1 as associate_member_f1
+from .statistics.comparative import comparison_view as comparison_view
+from .statistics.comparative import member_performance_view as member_performance_view
 
 __version__: str

@@ -193,3 +193,10 @@ modelos comparten nodos y no son observaciones independientes.
 Las fachadas históricas siguen disponibles para reproducir esquemas y cálculos previos; la API
 selectiva identifica sus contratos nuevos. Ninguna prueba sintética certifica resultados reales
 del paper ausente. Consulte la auditoría para fórmulas, decisiones y límites de validación.
+
+## Extensión comparativa fina
+
+La API de selección por F1, comparaciones por profundidad, centroides entre entidades/idiomas,
+referencias alternativas, Parquet particionado y ejecución con continuación se documenta en
+[comparative_geometry.md](comparative_geometry.md). Estas operaciones devuelven `ComparativeResult`
+y se invocan independientemente del dispatcher histórico `analyze`.

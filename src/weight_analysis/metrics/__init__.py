@@ -5,6 +5,7 @@ from __future__ import annotations
 from scipy.sparse.linalg import svds
 
 from ._validation import EPS
+from .centroids import projection_summary, update_geometry
 from .overlap import topk_overlap
 from .profiles import paper_trace_similarity, quantile_w1
 from .spectral import SPECTRAL_METRICS, spectral, spectral_metrics
@@ -47,4 +48,6 @@ __all__ = [
     "spectral_metrics",
     "subspaces",
     "topk_overlap",
+    "projection_summary",
+    "update_geometry",
 ]

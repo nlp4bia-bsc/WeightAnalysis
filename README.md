@@ -38,6 +38,7 @@ calcula unidades independientes y las agrega, sin checkpoints grandes ni red.
 ## Guías
 
 - [API, catálogo y ejecución independiente](docs/api.md).
+- [Geometría comparativa fina: F1, entidades/idiomas, referencias, Parquet y continuidad ante errores](docs/comparative_geometry.md).
 - [Auditoría matemática y limitaciones](docs/mathematical_audit.md).
 - [Referencia arquitectónica verificada de ner_lab y prioridades P0–P3](docs/architecture_reference.md).
 - [Plan de integración futura](docs/integration_plan.md).
