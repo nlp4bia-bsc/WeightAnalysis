@@ -79,11 +79,14 @@ La visualización utiliza Agg y resultados ya calculados, sin recomputar pesos.
 
 La API solicita GPU por defecto; las fixtures CPU y el ejemplo portátil ahora pasan
 `device="cpu"` explícitamente. Tras ampliar las rutas de cálculo, el flujo independiente dio
-**246 passed, 18 skipped** en este entorno CPU: nueve omisiones son los oráculos previos y
-nueve son pruebas de ejecución CUDA real sin hardware disponible. Los tests CPU contrastan
+**246 passed, 75 skipped** en este entorno CPU: nueve omisiones son los oráculos previos y
+66 son pruebas de ejecución CUDA real sin hardware disponible. Los tests CPU contrastan
 además alias/índices, error sin fallback, interpolación, cuantiles, overlap y el algoritmo
 truncado contra una SVD exacta, sin modificar el RNG global. La velocidad y la equivalencia en
 hardware CUDA siguen pendientes de ejecutar esas pruebas en destino; véase `gpu.md`.
+El marcador `gpu` permite seleccionar solo CUDA real con `python -m pytest -m gpu -v -rs`;
+incluye métricas individuales, los ocho análisis, formatos/precisión de tensores, RNG,
+residencia de kernels, caché, CLI y varias GPU cuando están disponibles.
 
 ## Reproducción
 

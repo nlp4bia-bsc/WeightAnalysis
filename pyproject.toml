@@ -31,6 +31,7 @@ packages = ["src/weight_analysis", "weightspace"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+markers = ["gpu: requires real CUDA hardware; skipped when torch.cuda.is_available() is false"]
 
 [tool.ruff]
 line-length = 100

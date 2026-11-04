@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import json
+import os
+import subprocess
+import sys
 
 import numpy as np
 import pandas as pd
@@ -10,7 +13,7 @@ import pytest
 import torch
 from safetensors.torch import save_file
 
-from weight_analysis import CheckpointSpec, analyze
+from weight_analysis import CheckpointSpec, analyze, read_result
 from weight_analysis.configuration import MetricOptions
 from weight_analysis.devices import resolve_device
 from weight_analysis.metrics import (
@@ -32,7 +35,23 @@ from weight_analysis.metrics.decomposition import (
     truncated_singular_values,
 )
 
-cuda = pytest.mark.skipif(not torch.cuda.is_available(), reason="Real CUDA GPU unavailable")
+
+def cuda(test):
+    """Expose actual CUDA cases through pytest -m gpu and skip them without hardware."""
+    return pytest.mark.gpu(
+        pytest.mark.skipif(
+            not torch.cuda.is_available(), reason="torch.cuda.is_available() is False"
+        )(test)
+    )
+
+
+@pytest.fixture(params=list(range(torch.cuda.device_count())) or [0], ids=lambda i: f"cuda:{i}")
+def cuda_device(request):
+    if not torch.cuda.is_available():
+        pytest.skip("torch.cuda.is_available() is False")
+    device = torch.device("cuda", request.param)
+    yield device
+    torch.cuda.synchronize(device)
 
 
 @pytest.fixture
@@ -224,3 +243,207 @@ def test_cuda_primitives_stay_on_device_and_never_use_scipy(monkeypatch):
     assert spectral(x, device="gpu", mode="topk", topk=4)["status"] == "topk_approx"
     historical, status = historical_basis(x, rank=3, device="gpu", max_exact_elements=1)
     assert historical.is_cuda and status == "topk_approx"
+
+
+METRIC_CASES = (
+    [("drift", name) for name in DRIFT_METRICS]
+    + [("pair", name) for name in PAIR_METRICS]
+    + [("spectral", name) for name in SPECTRAL_METRICS]
+)
+
+
+@pytest.mark.parametrize("family,name", METRIC_CASES, ids=[f"{f}:{m}" for f, m in METRIC_CASES])
+@cuda
+def test_each_metric_executes_on_real_cuda(cuda_device, family, name):
+    generator = torch.Generator().manual_seed(71)
+    base = torch.randn(12, 8, generator=generator, dtype=torch.float64)
+    final = 1.3 * base + base.sin() / 5
+    if family == "spectral":
+        expected = spectral_metrics(base, metrics=[name], device="cpu")[name]
+        actual = spectral_metrics(base, metrics=[name], device=str(cuda_device))[name]
+    else:
+        function = drift_metrics if family == "drift" else pair_metrics
+        expected = function(final, base, metrics=[name], device="cpu")[name]
+        actual = function(final, base, metrics=[name], device=str(cuda_device))[name]
+    np.testing.assert_allclose(actual, expected, rtol=1e-7, atol=1e-9, equal_nan=True)
+
+
+@pytest.mark.parametrize("dtype", [torch.float16, torch.bfloat16, torch.float32, torch.float64])
+@cuda
+def test_cuda_noncontiguous_inputs_keep_device_and_promote_precision(cuda_device, dtype):
+    from weight_analysis.metrics._validation import floating_tensor
+
+    matrix = torch.arange(1, 49, dtype=torch.float64).reshape(6, 8).to(dtype).T
+    assert not matrix.is_contiguous()
+    resident = matrix.to(cuda_device)
+    converted = floating_tensor(resident, name="matrix")
+    assert converted.device == cuda_device
+    assert converted.dtype == torch.float64
+    expected = spectral_metrics(matrix, metrics=["matrix_fro", "normalized_weight_quantiles"])
+    actual = spectral_metrics(resident, metrics=["matrix_fro", "normalized_weight_quantiles"])
+    np.testing.assert_allclose(actual["matrix_fro"], expected["matrix_fro"], rtol=1e-8)
+    np.testing.assert_allclose(
+        actual["normalized_weight_quantiles"], expected["normalized_weight_quantiles"], rtol=1e-8
+    )
+
+
+@pytest.mark.parametrize("case", ["zero", "constant", "sparse", "opposite"])
+@cuda
+def test_cuda_degenerate_vector_cases_match_cpu(cuda_device, case):
+    a = torch.tensor([0.0, -3.0, 3.0, 0.0, 1.0], dtype=torch.float64)
+    b = a.clone()
+    if case == "zero":
+        a.zero_()
+        b.zero_()
+    elif case == "constant":
+        a.fill_(2)
+        b.fill_(4)
+    elif case == "sparse":
+        b = torch.tensor([0.0, 2.0, 0.0, 0.0, -1.0], dtype=torch.float64)
+    else:
+        b = -a
+    expected = pair_metrics(a, b, metrics=PAIR_METRICS, device="cpu")
+    actual = pair_metrics(a, b, metrics=PAIR_METRICS, device=str(cuda_device))
+    assert actual == pytest.approx(expected, rel=1e-8, abs=1e-10, nan_ok=True)
+    assert topk_overlap(a, b, 0.4, device=str(cuda_device)) == pytest.approx(
+        topk_overlap(a, b, 0.4), rel=1e-8, abs=1e-10, nan_ok=True
+    )
+
+
+@cuda
+def test_cuda_rank_deficiency_zero_and_undefined_spectra(cuda_device):
+    matrix = torch.zeros(6, 4, dtype=torch.float64, device=cuda_device)
+    empty = principal_basis(matrix, rank=4)
+    assert empty.device == cuda_device and empty.shape == (6, 0)
+    values = spectral_metrics(matrix, metrics=["matrix_fro", "effective_rank"])
+    assert values["status"] == "zero_matrix" and values["matrix_fro"] == 0
+    assert np.isnan(values["effective_rank"])
+    matrix[0, 0], matrix[1, 1] = 4.0, 2.0
+    basis = principal_basis(matrix, rank=4)
+    assert basis.device == cuda_device and basis.shape == (6, 2)
+    torch.testing.assert_close(
+        basis.T @ basis, torch.eye(2, dtype=torch.float64, device=cuda_device)
+    )
+    with pytest.raises(ValueError, match="orthonormal"):
+        principal_angles(2 * basis, basis)
+
+
+@cuda
+def test_cuda_randomized_decomposition_preserves_cpu_and_cuda_rng(cuda_device):
+    from weight_analysis.metrics.decomposition import truncated_left_basis
+
+    matrix = torch.diag(torch.logspace(0, -6, 80, dtype=torch.float64)).to(cuda_device)
+    cpu_before = torch.random.get_rng_state().clone()
+    gpu_before = torch.cuda.get_rng_state(cuda_device).clone()
+    first = truncated_singular_values(matrix, 4)
+    second = truncated_singular_values(matrix, 4)
+    left, values = truncated_left_basis(matrix, 4)
+    assert first.device == left.device == values.device == cuda_device
+    torch.testing.assert_close(first, second, rtol=1e-12, atol=1e-12)
+    np.testing.assert_allclose(
+        first.cpu(), np.linalg.svd(matrix.cpu().numpy(), compute_uv=False)[:4], rtol=1e-6, atol=1e-9
+    )
+    assert torch.equal(cpu_before, torch.random.get_rng_state())
+    assert torch.equal(gpu_before, torch.cuda.get_rng_state(cuda_device))
+
+
+@pytest.mark.parametrize(
+    "analysis", ["pretraining_drift", "spectral_fingerprints", "language_entity_decomposition"]
+)
+@cuda
+def test_checkpoint_pipeline_calls_kernels_on_cuda(study, cuda_device, analysis, monkeypatch):
+    checkpoints, originals = study
+    calls = []
+    name = "stack" if analysis == "language_entity_decomposition" else "vector_norm"
+    namespace = torch if name == "stack" else torch.linalg
+    original = getattr(namespace, name)
+
+    def on_cuda(value, *args, **kwargs):
+        tensors = list(value) if name == "stack" else [value]
+        assert all(t.device == cuda_device for t in tensors), "Numerical kernel ran on CPU"
+        calls.append(name)
+        return original(value, *args, **kwargs)
+
+    monkeypatch.setattr(namespace, name, on_cuda)
+    result = analyze(
+        device=str(cuda_device),
+        analysis=analysis,
+        checkpoints=checkpoints,
+        originals=originals,
+        options=MetricOptions(spectral_mode="exact"),
+    )
+    assert calls and not result.data.empty
+
+
+@cuda
+def test_cuda_cache_and_parquet_roundtrip_do_not_recompute(
+    study, cuda_device, tmp_path, monkeypatch
+):
+    from weight_analysis.core import WeightReader
+
+    checkpoints, originals = study
+    arguments = dict(
+        analysis="pretraining_drift",
+        checkpoints=checkpoints[:1],
+        originals=originals,
+        cache_dir=tmp_path / "cache",
+    )
+    gpu = analyze(device=str(cuda_device), **arguments)
+    cpu = analyze(device="cpu", **arguments)
+    assert gpu.unit_id != cpu.unit_id
+    restored = read_result(tmp_path / "cache" / f"{gpu.unit_id}.parquet")
+    pd.testing.assert_frame_equal(gpu.data, restored.data, check_dtype=False)
+    assert restored.provenance == gpu.provenance
+
+    def no_recomputation(*args, **kwargs):
+        raise AssertionError("Valid CUDA cache unexpectedly reread a tensor")
+
+    monkeypatch.setattr(WeightReader, "get", no_recomputation)
+    reused = analyze(device=str(cuda_device), **arguments)
+    assert reused.unit_id == gpu.unit_id
+
+
+@cuda
+def test_cuda_cli_uses_requested_gpu_and_saves_result(study, cuda_device, tmp_path):
+    from dataclasses import asdict
+
+    checkpoints, originals = study
+    checkpoint = asdict(checkpoints[0])
+    checkpoint["path"] = str(checkpoint["path"])
+    output = tmp_path / "cli-result.parquet"
+    configuration = dict(
+        analysis="pretraining_drift",
+        device=str(cuda_device),
+        checkpoints=[checkpoint],
+        originals={k: str(v) for k, v in originals.items()},
+        output=str(output),
+    )
+    config_path = tmp_path / "run.json"
+    config_path.write_text(json.dumps(configuration))
+    environment = os.environ.copy()
+    environment.pop("PYTHONPATH", None)
+    completed = subprocess.run(
+        [sys.executable, "-m", "weight_analysis", "run", str(config_path)],
+        cwd=tmp_path,
+        env=environment,
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+    report = json.loads(completed.stdout)
+    result = read_result(output)
+    assert report["unit_id"] == result.unit_id and report["rows"] == len(result.data) > 0
+    assert result.provenance["configuration"]["options"]["device"] == str(cuda_device)
+    assert "cuda_device" in result.provenance["versions"]
+
+
+@cuda
+def test_two_cuda_devices_have_distinct_provenance(study):
+    if torch.cuda.device_count() < 2:
+        pytest.skip("Two CUDA GPUs required")
+    checkpoints, originals = study
+    arguments = dict(analysis="pretraining_drift", checkpoints=checkpoints[:1], originals=originals)
+    first = analyze(device="cuda:0", **arguments)
+    second = analyze(device="cuda:1", **arguments)
+    pd.testing.assert_frame_equal(first.data, second.data, rtol=1e-7, atol=1e-9)
+    assert first.unit_id != second.unit_id

@@ -71,3 +71,37 @@ contra oráculos NumPy y el RNG local. Sus pruebas CUDA ejecutan las ocho famili
 y comparan CPU/GPU cuando hay hardware. Se omiten explícitamente sin CUDA. El entorno de este
 desarrollo tiene PyTorch 2.15.0+cpu y ninguna GPU: no se ha ejecutado la rama CUDA real ni medido
 una aceleración. Es necesaria esa validación en el destino con CUDA antes de afirmar rendimiento.
+
+## Cómo ejecutar las pruebas CUDA
+
+Con la biblioteca instalada y PyTorch compatible con el driver CUDA del equipo:
+
+```console
+python -c "import torch; print(torch.__version__, torch.cuda.is_available(), torch.cuda.device_count())"
+python -m pytest -m gpu --strict-markers -v -rs
+```
+
+El marcador `gpu` selecciona solo pruebas que usan CUDA real. Todas comprueban
+`torch.cuda.is_available()` y se omiten automáticamente si devuelve `False`.
+Las que usan `cuda_device` se parametrizan por las GPU visibles detectadas con
+`torch.cuda.device_count()` y sincronizan el dispositivo al terminar. El caso específico de
+dos GPU se omite si solo hay una. No se sustituyen kernels CUDA por mocks para dar por
+validada la ejecución real.
+
+Para ejecutar también las pruebas de configuración y referencias CPU de este módulo:
+
+```console
+python -m pytest tests/test_gpu_execution.py -v -rs
+```
+
+La cobertura CUDA incluye las ocho familias de análisis, las 41 métricas seleccionables
+individuales, float16/bfloat16/float32/float64, tensores no contiguos, vectores cero/constantes/
+dispersos/opuestos, rango deficiente, espectros indefinidos y ortonormalidad. Comprueba además
+que los kernels del pipeline reciben tensores CUDA, que la aproximación no altera los RNG
+globales, que una caché GPU válida evita recalcular y que Parquet y el CLI conservan la
+procedencia del dispositivo. Los valores se comparan con CPU/NumPy usando tolerancias explícitas;
+no se comparan tiempos para exigir una aceleración que dependa del hardware.
+
+En un equipo sin CUDA se recogen **66 casos GPU** y se omiten con la razón
+`torch.cuda.is_available() is False`. Un resumen compuesto solo por omisiones significa
+que no se ha ejecutado ninguna prueba CUDA; no acredita que hayan aprobado.
