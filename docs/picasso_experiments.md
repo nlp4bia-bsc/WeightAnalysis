@@ -53,7 +53,9 @@ El wrapper de sbatch de Picasso rechazó el envío por stdin en la prueba del us
 usar los archivos `.sbatch` del repositorio. Tanto las pruebas como el array GPU incluyen
 `#SBATCH --constraint=dgx` y `#SBATCH --gres=gpu:1`, según la configuración confirmada
 por el usuario. El job de pruebas reserva una hora y verifica CUDA antes de ejecutar pytest;
-los logs son `wa-tests-<JOBID>.out` y `.err`. Continuar cuando termine sin fallos.
+los logs son `wa-tests-<JOBID>.out` y `.err`. La línea `[MODULE TORCH]` registra la versión
+y procedencia esperadas; el runner exige que `[CUDA]` use esa misma instalación.
+Continuar cuando termine sin fallos.
 La preparación y el finalizador declaran `--constraint=cpu` y no reservan GPU.
 
 Desde la raíz del checkout de WeightAnalysis en Picasso, colocar el Parquet original en esa raíz.

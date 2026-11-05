@@ -140,8 +140,10 @@ def test_snapshot_selection_survives_new_live_model_folders(tmp_path):
     assert sorted(p.name for p in (snapshot / "es/disease").iterdir()) == ["model"]
 
 
-def test_wheel_runs_cli_without_pythonpath_and_preserves_module_dependencies(tmp_path):
+def test_wheel_runs_cli_without_pythonpath_and_preserves_module_dependencies(tmp_path, monkeypatch):
     import os
+    import site
+    import sys
 
     bundle = (
         Path(os.environ["WEIGHT_ANALYSIS_TEST_BUNDLE"])
@@ -154,6 +156,16 @@ def test_wheel_runs_cli_without_pythonpath_and_preserves_module_dependencies(tmp
             reason="Local wheel build requires the build backend; Picasso uses its prebuilt bundle",
         )
         build_bundle(ROOT, bundle, build_isolation=False)
+    # Reproduce a module that overrides a global installation: active sys.path
+    # precedence must win over getsitepackages(), including in nested venvs.
+    active = tmp_path / "module" / "site-packages"
+    fallback = tmp_path / "global" / "site-packages"
+    for path, value in ((active, "module"), (fallback, "global")):
+        path.mkdir(parents=True)
+        (path / "wa_dependency_priority_probe.py").write_text(f"VALUE = {value!r}\n")
+    original_sites = site.getsitepackages()
+    monkeypatch.setattr(site, "getsitepackages", lambda: [str(fallback), *original_sites])
+    monkeypatch.setattr(sys, "path", [str(active), str(fallback), *sys.path])
     python, environment = installed_environment(bundle, ROOT, tmp_path / "installed")
     assert "PYTHONPATH" not in environment
     working = tmp_path / "outside"
@@ -171,7 +183,7 @@ def test_wheel_runs_cli_without_pythonpath_and_preserves_module_dependencies(tmp
         [
             str(python),
             "-c",
-            "import torch; import weightspace.metrics; import importlib.metadata; print(torch.__version__); assert importlib.metadata.version('weight-analysis')",
+            "import torch; import weightspace.metrics; import importlib.metadata; import wa_dependency_priority_probe as probe; assert probe.VALUE == 'module'; print(torch.__version__); assert importlib.metadata.version('weight-analysis')",
         ],
         cwd=working,
         env=environment,

@@ -45,8 +45,13 @@ ambos paquetes, ejecuta el CLI desde un directorio ajeno al checkout y valida CU
 que ejecutará pytest. La nueva prueba local reproduce ese contrato con un wheel real, no con
 un parche de sys.path ni omitiendo las pruebas fallidas.
 
-La nueva ejecución GPU en Picasso queda pendiente del usuario. Las pruebas locales usan CPU;
-no se extrapolan tiempos, VRAM ni número de omisiones de este entorno al cluster.
+El job posterior **3539092** completó **382 passed, 11 skipped** en 94.12 s sobre la B200.
+La instalación funcionó, pero el log mostró PyTorch 2.10.0+cu128 en el proceso inicial y
+2.10.0a0+b558c986e8.nv25.11 en el venv. El runner daba prioridad a los sitios globales frente
+al orden activo del módulo. Se conserva ahora ese orden y se exige que versión y ruta de
+PyTorch coincidan antes de ejecutar las pruebas CUDA. Una regresión reproduce dos instalaciones
+con distinta prioridad. La repetición GPU con esa coincidencia queda pendiente del usuario.
+Las pruebas locales usan CPU; no se extrapolan tiempos ni VRAM al cluster.
 Véase [picasso_experiments.md](picasso_experiments.md) para el envío actualizado.
 
 ## Baselines y retirada del flujo antiguo

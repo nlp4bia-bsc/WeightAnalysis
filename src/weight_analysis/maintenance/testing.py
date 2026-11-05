@@ -83,12 +83,12 @@ def installed_environment(bundle_dir, project_dir, environment_dir):
     dependency_sites = list(
         dict.fromkeys(
             [
-                *site.getsitepackages(),
                 *(
                     path
                     for path in sys.path
                     if path and Path(path).name in {"site-packages", "dist-packages"}
                 ),
+                *site.getsitepackages(),
             ]
         )
     )
@@ -135,11 +135,23 @@ def run_tests(bundle_dir, project_dir, *, pytest_args=(), require_cuda=False):
         )
         environment["WEIGHT_ANALYSIS_TEST_BUNDLE"] = str(Path(bundle_dir).resolve())
         if require_cuda:
+            import torch
+
+            expected_version = str(torch.__version__)
+            expected_origin = str(Path(torch.__file__).resolve())
+            print("[MODULE TORCH]", expected_version, expected_origin, flush=True)
             subprocess.run(
                 [
                     str(executable),
                     "-c",
-                    'import torch; assert torch.cuda.is_available(), "CUDA unavailable in installed test environment"; print("[CUDA]", torch.__version__, torch.cuda.get_device_name(0), flush=True)',
+                    """import pathlib, sys, torch
+assert str(torch.__version__) == sys.argv[1], ("PyTorch version changed", sys.argv[1], torch.__version__)
+assert str(pathlib.Path(torch.__file__).resolve()) == sys.argv[2], ("PyTorch origin changed", sys.argv[2], torch.__file__)
+assert torch.cuda.is_available(), "CUDA unavailable in installed test environment"
+print("[CUDA]", torch.__version__, torch.cuda.get_device_name(0), flush=True)
+""",
+                    expected_version,
+                    expected_origin,
                 ],
                 env=environment,
                 check=True,
