@@ -57,6 +57,7 @@ class ComparativeContext:
         self.reference_rows = {}
         self.reference_contents = {}
         self.fingerprint_plan = {}
+        self.input_guard = None
         self.definition = {
             "version": DEFINITION,
             "options": {**asdict(options), "device": self.device},
@@ -133,6 +134,8 @@ class ComparativeContext:
         return keys
 
     def unit(self, identity, operation, **context):
+        if self.input_guard is not None:
+            self.input_guard()
         uid = stable_id({"identity": identity, "definition": self.definition})
         if uid in self.unit_cache:
             return uid, self.unit_cache[uid]

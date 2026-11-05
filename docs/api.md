@@ -200,3 +200,10 @@ La API de selección por F1, comparaciones por profundidad, centroides entre ent
 referencias alternativas, Parquet particionado y ejecución con continuación se documenta en
 [comparative_geometry.md](comparative_geometry.md). Estas operaciones devuelven `ComparativeResult`
 y se invocan independientemente del dispatcher histórico `analyze`.
+
+## Experimentos y adaptador Picasso
+
+`python -m weight_analysis.experiments` ofrece `audit`, `prepare`, `worker`, `submit`,
+`finalize` y `figures`. La [guía de Picasso](picasso_experiments.md) documenta el Parquet
+experimental recibido, fold 1, referencias de pretraining y productos F1 normalizados.
+El dispatcher histórico `analyze` conserva su comportamiento.

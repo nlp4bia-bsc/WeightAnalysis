@@ -42,9 +42,10 @@ def analyze_shared_adaptation(
     resume: bool = True,
     block_elements: int = 100_000,
     allow_unverified_origin: bool = False,
+    _context: ComparativeContext | None = None,
 ) -> ComparativeResult:
     """Compare one member per entity/language inside explicit fixed experimental strata."""
-    if axis not in ("entity", "language") or set(metrics) - set(SHARED_METRICS):
+    if axis not in ("entity", "language", "cell") or set(metrics) - set(SHARED_METRICS):
         raise ValueError("Unknown shared adaptation axis or metric")
     if not leave_one_out and any(m.startswith("loo_") for m in metrics):
         raise ValueError("LOO metrics require leave_one_out=True")
@@ -62,29 +63,39 @@ def analyze_shared_adaptation(
         tables["performance"] = validated
     ctx = reporter.attempt(
         "preflight",
-        lambda: ComparativeContext(
-            options=options,
-            device=device,
-            parameters=parameters,
-            references=references,
-            reporter=reporter,
-            on_error=on_error,
-            cache_dir=cache_dir,
-            resume=resume,
-            block_elements=block_elements,
-            allow_unverified=allow_unverified_origin,
+        lambda: (
+            _context
+            or ComparativeContext(
+                options=options,
+                device=device,
+                parameters=parameters,
+                references=references,
+                reporter=reporter,
+                on_error=on_error,
+                cache_dir=cache_dir,
+                resume=resume,
+                block_elements=block_elements,
+                allow_unverified=allow_unverified_origin,
+            )
         ),
         on_error=on_error,
     )
+    if _context is not None and (
+        _context.parameters != parameters
+        or _context.options != options
+        or _context.references != references
+        or _context.reporter is not reporter
+    ):
+        raise ValueError("Shared context differs from requested scientific configuration")
     groups, member_rows, statistics, detailed = [], [], [], []
     if ctx:
         strata = {}
-        fixed = "language" if axis == "entity" else "entity"
+        fixed = "cell_scope" if axis == "cell" else ("language" if axis == "entity" else "entity")
         for entry in members:
             cp = entry.checkpoint
             key = (
                 cp.backbone,
-                getattr(cp, fixed),
+                "all_cells" if axis == "cell" else getattr(cp, fixed),
                 cp.fold,
                 cp.seed,
                 entry.parameter_space_id,
@@ -98,9 +109,14 @@ def analyze_shared_adaptation(
             )
 
             def process_group():
-                if len(group) < 2 or len({getattr(e.checkpoint, axis) for e in group}) != len(
-                    group
-                ):
+                if len(group) < 2 or len(
+                    {
+                        (e.checkpoint.language, e.checkpoint.entity)
+                        if axis == "cell"
+                        else getattr(e.checkpoint, axis)
+                        for e in group
+                    }
+                ) != len(group):
                     raise ValueError(
                         "Select exactly one checkpoint per axis value, with at least two members"
                     )

@@ -12,3 +12,8 @@ dist/
 build/
 *.egg-info/
 .venv/
+
+# Experimental inputs and generated research artifacts stay local.
+/results_aggregated.parquet
+/local_results/
+!/scripts/picasso/*.sh

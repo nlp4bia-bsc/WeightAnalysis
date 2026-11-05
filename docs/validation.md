@@ -146,3 +146,28 @@ previas; no se han reformateado ni alterado esos tests como parte de la extensi�
 El ejemplo `python examples/comparative_geometry.py` completa cálculo, reunión, agregación y
 lectura/escritura Parquet sin red. La guía matemática, esquemas y límites están en
 [comparative_geometry.md](comparative_geometry.md).
+
+## Parquet experimental y adaptadores Picasso
+
+Se inspeccionó el Parquet experimental recibido: 459 filas, 16 columnas, 22 backbones,
+siete idiomas y tres entidades. La auditoría local conserva esquema completo y hash; el
+original y los derivados locales están excluidos de Git. No hay nulos ni duplicados por
+idioma/entidad/modelo; faltan las tres celdas neerlandesas de un backbone. Se respetan los
+cuatro folds agregados del F1 y la declaración del usuario de pesos de fold 1, sin inventar
+la semilla numérica. No se pudo inspeccionar el filesystem remoto de Picasso.
+
+La validación independiente con el adaptador nuevo da **295 passed, 80 skipped**. La suite
+`tests/test_picasso_experiments.py` aporta doce casos CPU y un caso CUDA omitido sin GPU.
+Cubre auditoría, cobertura completa de macros, rankings deterministas, manifiestos,
+F1 ausente/inválido, ejecución de arrays con pesos sintéticos, unión de ambos extremos,
+centroides por backbone, reanudación, señal/presupuesto, modificación de entradas, marcadores
+corruptos, figuras desde tablas y finalización que falla si intenta leer pesos.
+
+Los scripts pasan `bash -n`. El envío se prueba con sbatch simulado y sus IDs/dependencias;
+no se han enviado jobs ni se han medido tiempos/VRAM en Picasso. La reserva de 8 horas y una
+GPU por elemento no garantiza que un shard grande termine en un único turno. El run conserva
+unidades completadas y publica los índices que necesitan reanudación. Ruff sobre `src/` y el
+test nuevo, `pip check` y build de sdist/wheel pasan. El módulo SLURM **histórico** con scripts
+raíz ausentes sigue excluido explícitamente, como en las regresiones anteriores; los nuevos
+adaptadores tienen su propia cobertura y no simulan compatibilidad con aquel flujo antiguo.
+Véase [picasso_experiments.md](picasso_experiments.md) para comandos, esquemas y límites.
