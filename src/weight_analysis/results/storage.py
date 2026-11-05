@@ -55,7 +55,7 @@ def read_result(path: str | Path) -> AnalysisResult:
 
     input_path = Path(path)
     try:
-        table = pq.read_table(input_path)
+        table = pq.ParquetFile(input_path).read()
         metadata = table.schema.metadata or {}
         attributes = {
             key: metadata[(METADATA_PREFIX + key).encode()].decode()

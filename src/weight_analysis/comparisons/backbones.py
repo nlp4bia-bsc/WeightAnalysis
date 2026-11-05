@@ -165,7 +165,11 @@ def compare_backbones(
         x = xprofile(da)
         y = xprofile(db)
         if x is not None and y is not None:
-            measures.append(float(np.mean(np.abs(x - y))))
+            measures.append(
+                float((x - y).abs().mean())
+                if isinstance(x, torch.Tensor)
+                else float(np.mean(np.abs(x - y)))
+            )
     row["adaptation_profile_l1"] = (
         float(np.mean(measures)) if len(measures) >= min_components else math.nan
     )

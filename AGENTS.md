@@ -2,8 +2,8 @@
 
 - Mantener `weight_analysis` independiente de `ner_lab`; la referencia arquitectónica y su SHA
   están en `docs/architecture_reference.md`. No integrar ni copiar código de ner_lab.
-- No crear `.sh`, `.sbatch`, scheduling, colas ni infraestructura SLURM. Las unidades de cálculo
-  se ejecutan mediante Python y se distribuyen externamente.
+- La petición posterior del usuario autoriza adaptadores SLURM en `scripts/picasso/`.
+  Mantener scheduling fuera del núcleo científico; no ejecutar sbatch durante desarrollo.
 - Preservar definiciones y compatibilidad histórica. Obtener baseline y regresiones antes de
   cambiar fórmulas; justificar cambios en la auditoría y conservar identificaciones históricas.
 - Separar contratos/lectura, métricas, análisis, comparación, estadística, resultados y visualización.

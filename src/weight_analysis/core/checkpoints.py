@@ -46,7 +46,7 @@ class CheckpointSpec:
     language: str
     entity: str
     path: Path | str
-    fold: int = 1
+    fold: int | None = 1
     seed: int | None = None
     checkpoint_id: str | None = None
 
@@ -55,8 +55,10 @@ class CheckpointSpec:
             value = getattr(self, name)
             if not isinstance(value, str) or not value.strip():
                 raise ValueError(f"{name} must be a nonempty string; got {value!r}")
-        if isinstance(self.fold, bool) or not isinstance(self.fold, int) or self.fold < 1:
-            raise ValueError(f"fold must be a positive integer; got {self.fold!r}")
+        if self.fold is not None and (
+            isinstance(self.fold, bool) or not isinstance(self.fold, int) or self.fold < 1
+        ):
+            raise ValueError(f"fold must be a positive integer or None; got {self.fold!r}")
         if self.seed is not None and (
             isinstance(self.seed, bool) or not isinstance(self.seed, int)
         ):
