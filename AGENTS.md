@@ -15,6 +15,6 @@
   no ejecutadas. No ocultar fallos previos de scripts ausentes ni inventar sustitutos.
 - No afirmar confirmación del paper sin paper, hipótesis y datos. Pares dependientes no son
   réplicas independientes; no atribuir una media de F1 entre folds a un único checkpoint.
-- Todo el código de producción vive en src/ (weight_analysis y compatibilidad weightspace).
+- Todo el código de producción vive en src/ (weight_analysis, weight_analysis_scheduler y weightspace).
   Los ejemplos ejecutables también se distribuyen como módulos; no restaurar launchers Python de raíz.
 - Mantener README y AGENTS breves; detalles científicos y contratos públicos pertenecen a `docs/`.
