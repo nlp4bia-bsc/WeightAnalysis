@@ -38,6 +38,19 @@ quedan pendientes hasta `prepare` en destino.
 
 ## Preparar y lanzar
 
+Desde la raíz del repositorio, enviar primero las pruebas como un archivo de batch:
+
+```bash
+sbatch scripts/picasso/tests.sbatch
+```
+
+El wrapper de sbatch de Picasso rechazó el envío por stdin en la prueba del usuario;
+usar los archivos `.sbatch` del repositorio. Tanto las pruebas como el array GPU incluyen
+`#SBATCH --constraint=dgx` y `#SBATCH --gres=gpu:1`, según la configuración confirmada
+por el usuario. El job de pruebas reserva una hora y verifica CUDA antes de ejecutar pytest;
+los logs son `wa-tests-<JOBID>.out` y `.err`. Continuar cuando termine sin fallos.
+La preparación y el finalizador declaran `--constraint=cpu` y no reservan GPU.
+
 Desde la raíz del checkout de WeightAnalysis en Picasso, colocar el Parquet original en esa raíz.
 Mantener el mismo código durante todo el run. El directorio de salida pedido es **weigh_analysis_final**:
 
@@ -70,6 +83,7 @@ Se envía un array GPU y un finalizador CPU con dependencia `afterany`. Cada ele
 **una GPU, 8 CPU, 48 GB y 08:00:00**. `--concurrency 1` ejecuta un elemento a la vez;
 puede aumentarse si se quieren varias GPU simultáneas, una por elemento. Para restricciones
 locales, añadir `--partition NOMBRE`, `--account CUENTA` o `--constraint TIPO_GPU`.
+El constraint GPU por defecto es `dgx`; un argumento explícito puede sustituirlo.
 No se inventa una partición de Picasso. La partición/constraint GPU no se reutiliza en el job CPU.
 Para una cola CPU especial, lanzar `finalize.sbatch` manualmente con las opciones de esa cola.
 
