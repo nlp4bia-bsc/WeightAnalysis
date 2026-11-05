@@ -31,10 +31,11 @@ pasar `--checkpoint-seed N` al preparar; nunca se supone que sea 42. El F1 manti
 `configuration_aggregate_unknown_fold_ids`: no son cuatro observaciones de los pesos de fold 1.
 Las asociaciones son descriptivas y no producen valores p iid para pares dependientes.
 
-La relación esperada por directorios se comprobará **en Picasso**. Este entorno no monta
-`/mnt/fscratch/...`: no se afirma haber emparejado ni examinado los pesos reales. La auditoría
-local está en `local_results/ner_source/source_audit.json`; los recuentos de correspondencias
-quedan pendientes hasta `prepare` en destino.
+Este entorno no monta `/mnt/fscratch/...`; aquí no se han examinado los pesos reales.
+La auditoría aportada por el usuario desde Picasso registra 459 resultados NER emparejados,
+ninguno sin correspondencia y dos checkpoints sin puntuación. Esos dos checkpoints pueden
+participar en geometría independiente de F1. Cada run nuevo vuelve a comprobar los archivos;
+los recuentos definitivos están en su `ner_source/source_audit.json`.
 
 ## Preparar y lanzar
 
@@ -62,7 +63,7 @@ Desde la raíz del checkout de WeightAnalysis en Picasso, colocar el Parquet ori
 Mantener el mismo código durante todo el run. El directorio de salida pedido es **weigh_analysis_final**:
 
 ```bash
-module load pytorch/2.10.0
+cd ~/WeightAnalysis
 export WEIGHT_ANALYSIS_PROJECT_DIR="$PWD"
 export PYTHONPATH="$PWD/src${PYTHONPATH:+:$PYTHONPATH}"
 RUN_DIR=/mnt/fscratch/users/gaias_001_uma/fgd/ner_lab/TFG_Aziz/weigh_analysis_final/run-001
@@ -85,6 +86,21 @@ Desde el nodo de login, tras existir `plan.json`:
 ```bash
 bash scripts/picasso/submit.sh --run-dir "$RUN_DIR" --concurrency 1
 ```
+
+El envío usa `/usr/bin/python3` **del host** con biblioteca estándar, sin cargar el módulo
+PyTorch. El `python` de `pytorch/2.10.0` entra en un contenedor donde `sbatch` no está
+disponible; no utilizar ese intérprete para enviar jobs. Los jobs sí cargan el módulo al
+ejecutarse. Si el host tiene Python en otra ruta, definir
+`WEIGHT_ANALYSIS_HOST_PYTHON=/ruta/absoluta/python3` (Python >=3.6). El adaptador se distribuye
+en `src/weight_analysis_scheduler/` y comprueba la misma firma del plan que el worker.
+
+Un plan preparado antes de esta separación puede tener una firma de código distinta, porque
+la firma histórica incluía `experiments/submission.py`. En ese caso, preparar una vez un
+**run nuevo**, por ejemplo `weigh_analysis_final/run-002`, con el checkout actualizado.
+No editar `code_digest` ni `run_id` a mano ni reutilizar resultados de otro plan. El adaptador
+externo queda fuera de la firma científica, por lo que cambios futuros solo en el envío no
+obligan a recalcular la preparación. Mantener los runs en fscratch: un `RUN_DIR` situado
+en `~/WeightAnalysis/run-001` escribiría también todos sus resultados en HOME.
 
 Se envía un array GPU y un finalizador CPU con dependencia `afterany`. Cada elemento pide
 **una GPU, 8 CPU, 48 GB y 08:00:00**. `--concurrency 1` ejecuta un elemento a la vez;

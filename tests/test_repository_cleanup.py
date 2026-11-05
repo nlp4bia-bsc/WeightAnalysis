@@ -183,7 +183,7 @@ def test_wheel_runs_cli_without_pythonpath_and_preserves_module_dependencies(tmp
         [
             str(python),
             "-c",
-            "import torch; import weightspace.metrics; import importlib.metadata; import wa_dependency_priority_probe as probe; assert probe.VALUE == 'module'; print(torch.__version__); assert importlib.metadata.version('weight-analysis')",
+            "import torch; import weightspace.metrics; import weight_analysis_scheduler.submission; import importlib.metadata; import wa_dependency_priority_probe as probe; assert probe.VALUE == 'module'; print(torch.__version__); assert importlib.metadata.version('weight-analysis')",
         ],
         cwd=working,
         env=environment,
