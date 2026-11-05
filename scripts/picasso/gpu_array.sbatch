@@ -4,6 +4,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=48G
+#SBATCH --constraint=dgx
 #SBATCH --gres=gpu:1
 #SBATCH --time=08:00:00
 #SBATCH --signal=B:USR1@300

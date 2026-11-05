@@ -210,8 +210,15 @@ def test_sbatch_resources_and_syntax():
     gpu = (root / "gpu_array.sbatch").read_text()
     assert "#SBATCH --time=08:00:00" in gpu
     assert "#SBATCH --gres=gpu:1" in gpu
+    assert "#SBATCH --constraint=dgx" in gpu
     assert "SLURM_ARRAY_TASK_ID" in gpu and "--signal=B:USR1@300" in gpu
     assert "sbatch" not in gpu
+    checks = (root / "tests.sbatch").read_text()
+    assert "#SBATCH --constraint=dgx" in checks and "#SBATCH --gres=gpu:1" in checks
+    assert "torch.cuda.is_available()" in checks and "python -m pytest" in checks
+    for name in ("prepare.sbatch", "finalize.sbatch"):
+        cpu = (root / name).read_text()
+        assert "#SBATCH --constraint=cpu" in cpu and "#SBATCH --gres" not in cpu
 
 
 def test_changed_weights_fail_affected_work_but_other_checkpoints_continue(experiment):

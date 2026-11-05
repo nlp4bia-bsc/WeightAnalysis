@@ -4,6 +4,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=48G
+#SBATCH --constraint=cpu
 #SBATCH --time=08:00:00
 #SBATCH --output=wa-prepare-%j.out
 #SBATCH --error=wa-prepare-%j.err
