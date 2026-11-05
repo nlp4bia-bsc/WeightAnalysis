@@ -24,9 +24,13 @@ visualization = ["matplotlib>=3.8"]
 
 [project.scripts]
 weight-analysis = "weight_analysis.cli:main"
+weight-analysis-maintenance = "weight_analysis.maintenance.__main__:main"
+weightspace = "weightspace.cli:main"
+weightspace-parallel = "weightspace.parallel:main"
+weightspace-reports = "weightspace.reports.__main__:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/weight_analysis", "weightspace"]
+packages = ["src/weight_analysis", "src/weightspace"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

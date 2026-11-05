@@ -5,15 +5,14 @@ are atomic, private to that analysis, and deleted only on successful finalizatio
 The traditional `python -m weightspace` pipeline remains available unchanged.
 """
 from __future__ import annotations
-import argparse
-from collections import defaultdict
-from itertools import combinations
-import logging
-import os
-from pathlib import Path
-import uuid
+
 import hashlib
 import json
+import logging
+import os
+import uuid
+from itertools import combinations
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -21,13 +20,18 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 from .analyses import (
-    describe_checkpoint, compare_related, compare_backbones, ranks,
-    factorial, model_distance_summary, rank_related_encoder_pairs,
+    compare_backbones,
+    compare_related,
+    describe_checkpoint,
+    factorial,
+    model_distance_summary,
+    rank_related_encoder_pairs,
+    ranks,
 )
-from .checkpoints import discover, config_metadata
+from .checkpoints import config_metadata, discover
 from .cli import parser as original_parser
 from .performance import summarize_f1
-from .storage import METADATA, write_parquet, load_performance, with_performance
+from .storage import METADATA, load_performance, with_performance, write_parquet
 
 LOG = logging.getLogger('weightspace.parallel')
 NAMES = {

@@ -1,6 +1,6 @@
 """Portable CPU example: F1 selection, disjoint units, shared geometry and Parquet.
 
-Run with the package installed: python examples/comparative_geometry.py
+Run with the package installed: python -m weight_analysis.examples.comparative_geometry
 All inputs and results live in a temporary directory; no network or scheduler is used.
 """
 

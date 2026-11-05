@@ -174,8 +174,8 @@ p-values para díadas no independientes. El flujo histórico relaciona pesos de 
 como cuatro réplicas de pesos. La comprobación de claves de rendimiento y las
 uniones son responsabilidad de la capa de resultados, no de las métricas.
 
-Los scripts existentes `validacion_f1_weightspace` consumen tablas externas mediante
-`WS_DATA` y `WS_F1`. No se ejecutan como efecto secundario de la librería. No se han
+Los informes históricos están en `src/weightspace/reports`; se invocan como
+`python -m weightspace.reports` con rutas explícitas o `WS_DATA`/`WS_F1`. No se ejecutan como efecto secundario de la librería. No se han
 aportado esas tablas ni se han validado resultados estadísticos del estudio real.
 
 ## Funcionalidad no implementada por falta de evidencia/datos

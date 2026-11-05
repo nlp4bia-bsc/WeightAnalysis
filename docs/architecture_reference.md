@@ -54,7 +54,7 @@ de fórmulas atribuidas a artículos. Esas citas no identifican por sí solas el
 Por tanto, puede comprobarse equivalencia matemática local y regresión sobre fixtures, pero no afirmar
 que una métrica confirma una hipótesis real del paper ni reproducir resultados empíricos ausentes.
 
-El archivo histórico `validacion_f1_weightspace/resultados/resumen_ejecutivo.md` describe resultados
+El archivo histórico `docs/history/legacy_f1_exploration.md` describe resultados
 exploratorios y reconoce la dependencia entre pares. No se toman sus recuentos, correlaciones o
 valores p como resultados revalidados: los datos necesarios no están en el checkout.
 

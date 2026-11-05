@@ -27,4 +27,7 @@ print("Python:", sys.version, "PyTorch:", torch.__version__, "PyArrow:", pyarrow
 assert torch.cuda.is_available(), "CUDA unavailable in the DGX test allocation"
 print("GPU:", torch.cuda.get_device_name(0), flush=True)
 PY
-python -m pytest -q -rs --ignore=tests/test_slurm_orchestration.py "$@"
+BUNDLE_DIR="${1:?Use bash scripts/picasso/submit_tests.sh to build the installed test package first}"
+shift
+python -m weight_analysis.maintenance.testing run --project-dir "$PROJECT_DIR" \
+  --bundle-dir "$BUNDLE_DIR" --require-cuda -- -q -rs "$@"

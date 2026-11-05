@@ -1,12 +1,14 @@
 """Single ZSTD Parquet per populated experiment, with atomic completion."""
 from __future__ import annotations
-from pathlib import Path
+
 import logging
-import math
 import os
 import uuid
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
+
 LOG=logging.getLogger(__name__)
 
 METADATA={

@@ -41,8 +41,13 @@ quedan pendientes hasta `prepare` en destino.
 Desde la raíz del repositorio, enviar primero las pruebas como un archivo de batch:
 
 ```bash
-sbatch scripts/picasso/tests.sbatch
+bash scripts/picasso/submit_tests.sh
 ```
+
+El script construye un wheel en login, con `pip wheel --no-deps`, y envía su ruta al batch.
+La construcción puede descargar el backend de build en login; el nodo GPU instala el wheel
+sin red y sin reinstalar torch. Necesita un pip moderno (>=22.3) para gestionar el venv temporal.
+Los hashes del bundle impiden probar un wheel diferente del checkout actual.
 
 El wrapper de sbatch de Picasso rechazó el envío por stdin en la prueba del usuario;
 usar los archivos `.sbatch` del repositorio. Tanto las pruebas como el array GPU incluyen
@@ -94,7 +99,9 @@ exacto se descubre en destino, sin suponer cuántos checkpoints existen.
 
 Las dependencias Python deben estar disponibles en el módulo/entorno del job: torch >=2.10,
 numpy >=2, pandas >=2.2,<3, scipy >=1.13, pyarrow >=17, safetensors >=0.4. Matplotlib >=3.8
-solo se requiere para figuras. Los scripts añaden `src/` a PYTHONPATH, incluida su propagación
+solo se requiere para figuras. Las pruebas instalan el wheel en un venv temporal que hereda
+las dependencias del módulo; no dependen de una instalación --user hecha con otro Python.
+Los scripts añaden `src/` a PYTHONPATH, incluida su propagación
 Singularity/Apptainer, y no instalan paquetes ni descargan modelos desde nodos de cálculo.
 No se ha probado aquí el módulo específico de Picasso; la validación local usa PyTorch CPU.
 
@@ -163,7 +170,10 @@ los checkpoints. No editar pesos, originales ni código durante el run.
 
 El finalizador se ejecuta aun cuando haya fallado un elemento del array. Nunca marca como completo
 un resultado parcial; conserva cobertura, incidencias e índices pendientes en
-`derived/finalization.json`. Para reanudar desde login:
+`derived/finalization.json`. El envío inicial es idempotente: repetirlo conserva los IDs ya
+registrados, incluso si solo falló el envío del finalizador. Una respuesta exitosa sin un ID
+reconocible se guarda en `submissions/unparsed-*.json` y bloquea un nuevo envío hasta verificar
+la cola; así no se duplican jobs de ID desconocido. Para reanudar desde login:
 
 ```bash
 bash scripts/picasso/submit.sh --run-dir "$RUN_DIR" --concurrency 1 --retry
