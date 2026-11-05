@@ -1,17 +1,29 @@
 """CLI orchestrating checkpoint-only A1-A5 and B1-B5 experiments."""
 from __future__ import annotations
+
 import argparse
-from collections import defaultdict
-from itertools import combinations
 import logging
+from collections import defaultdict
+from importlib import import_module
+from itertools import combinations
 from pathlib import Path
-import math
+
 import pandas as pd
 import torch
-from .checkpoints import discover,WeightReader,config_metadata,audit_alignment
-from .analyses import describe_checkpoint,compare_related,compare_backbones,ranks,factorial,model_distance_summary,rank_related_encoder_pairs
-from .storage import write_parquet,load_performance,with_performance
+
+from .analyses import (
+    compare_backbones,
+    compare_related,
+    describe_checkpoint,
+    factorial,
+    model_distance_summary,
+    rank_related_encoder_pairs,
+    ranks,
+)
+from .checkpoints import WeightReader, audit_alignment, config_metadata, discover
 from .performance import summarize_f1
+from .storage import load_performance, with_performance, write_parquet
+
 LOG=logging.getLogger('weightspace')
 
 
@@ -65,7 +77,7 @@ def run(argv=None):
     if args.dry_run or args.deep_dry_run:
         LOG.info('DRY-RUN complete. No files written.');return
     # Fail FAST on Parquet dependency before multi-hour analysis.
-    try:import pyarrow
+    try:import_module("pyarrow")
     except ImportError as e:raise RuntimeError('pyarrow unavailable; install requirements before running') from e
     scores=load_performance(args.performance)
     out=args.output.expanduser().resolve()

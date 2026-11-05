@@ -215,7 +215,10 @@ def test_sbatch_resources_and_syntax():
     assert "sbatch" not in gpu
     checks = (root / "tests.sbatch").read_text()
     assert "#SBATCH --constraint=dgx" in checks and "#SBATCH --gres=gpu:1" in checks
-    assert "torch.cuda.is_available()" in checks and "python -m pytest" in checks
+    assert (
+        "torch.cuda.is_available()" in checks
+        and "weight_analysis.maintenance.testing run" in checks
+    )
     for name in ("prepare.sbatch", "finalize.sbatch"):
         cpu = (root / name).read_text()
         assert "#SBATCH --constraint=cpu" in cpu and "#SBATCH --gres" not in cpu
@@ -299,3 +302,65 @@ def test_scheduler_error_keeps_actual_diagnostic(experiment, monkeypatch):
     monkeypatch.setattr(subprocess, "run", reject)
     with pytest.raises(RuntimeError, match="Invalid account or partition"):
         submit(experiment[-1], scripts="/reviewed/scripts")
+
+
+@pytest.mark.parametrize(
+    "response",
+    [
+        "900001\n",
+        "900001\r\n",
+        "  900001  \n",
+        "notice from sbatch.orig\n900001\n",
+        "900001;picasso\n",
+        "Submitted batch job 900001\n",
+    ],
+)
+def test_scheduler_wrapped_output_keeps_historical_job_id_support(response):
+    from weight_analysis.experiments.submission import parse_job_id
+
+    assert parse_job_id(response) == "900001"
+
+
+def test_submission_is_idempotent_and_resumes_failed_finalizer_submission(experiment, monkeypatch):
+    import subprocess
+    from types import SimpleNamespace
+
+    from weight_analysis.experiments.submission import submit
+
+    prepare(experiment)
+    calls = []
+
+    def scheduler(command, **kwargs):
+        calls.append(command)
+        if len(calls) == 2:
+            raise subprocess.CalledProcessError(1, command, stderr="CPU queue unavailable")
+        return SimpleNamespace(stdout=f"90000{len(calls)}\n", stderr="")
+
+    monkeypatch.setattr(subprocess, "run", scheduler)
+    with pytest.raises(RuntimeError, match="CPU queue unavailable"):
+        submit(experiment[-1], scripts="/scripts")
+    completed = submit(experiment[-1], scripts="/scripts")
+    assert completed["gpu_job_ids"] == ["900001"] and len(calls) == 3
+    assert sum("--array" in command for command in calls) == 1
+    assert submit(experiment[-1], scripts="/scripts") == completed
+    assert len(calls) == 3
+
+
+def test_unparsed_success_is_quarantined_before_any_resubmission(experiment, monkeypatch):
+    from types import SimpleNamespace
+
+    from weight_analysis.experiments.submission import submit
+
+    prepare(experiment)
+    calls = []
+
+    def scheduler(command, **kwargs):
+        calls.append(command)
+        return SimpleNamespace(stdout="Accepted unknown ID format", stderr="")
+
+    monkeypatch.setattr("subprocess.run", scheduler)
+    with pytest.raises(RuntimeError, match="Unrecognized successful"):
+        submit(experiment[-1], scripts="/scripts")
+    with pytest.raises(RuntimeError, match="previous sbatch output"):
+        submit(experiment[-1], scripts="/scripts")
+    assert len(calls) == 1

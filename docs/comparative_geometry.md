@@ -397,4 +397,4 @@ Las pruebas GPU reales cubren comparación directa/intrínseca y ambos ejes, y s
 5. Reunir estadísticas, agregar explícitamente y comprobar incidencias/cobertura.
 6. Relacionar F1 y dibujar vistas filtradas; guardar el dataset y su procedencia.
 
-Ejemplo ejecutable sin red: [comparative_geometry.py](../examples/comparative_geometry.py).
+Ejemplo ejecutable sin red: [comparative_geometry.py](../src/weight_analysis/examples/comparative_geometry.py).

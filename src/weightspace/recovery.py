@@ -11,14 +11,12 @@ code hash is part of the config signature.
 from __future__ import annotations
 
 import argparse
-from contextlib import contextmanager
 import fcntl
-from itertools import combinations
-import json
 import logging
 import os
-from pathlib import Path
 import uuid
+from itertools import combinations
+from pathlib import Path
 
 import pandas as pd
 import pyarrow as pa
@@ -134,13 +132,13 @@ def merge_if_ready(stage: Path, shard: int, total: int, signature: str):
         return True
 
 
-def main():
+def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--run-dir', type=Path, required=True)
-    p.add_argument('--shard', type=int, choices=[0, 2], required=True)
+    p.add_argument('--shard', type=int, required=True)
     p.add_argument('--piece', type=int, required=True)
     p.add_argument('--pieces', type=int, default=8)
-    a = p.parse_args()
+    a = p.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(message)s')
     if a.pieces < 2 or not 0 <= a.piece < a.pieces:
         p.error('Invalid --piece/--pieces')

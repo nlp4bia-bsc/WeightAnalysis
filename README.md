@@ -32,12 +32,13 @@ y PyTorch con CUDA; no hay sustitución silenciosa por CPU. [Detalles GPU](docs/
 
 El cálculo devuelve `AnalysisResult`; escribirlo requiere una llamada explícita a `write_result`.
 Solo `cache_dir` solicita persistencia automática. El ejemplo autocontenido
-[`examples/independent_analysis.py`](examples/independent_analysis.py) genera pesos sintéticos,
+[`independent_analysis.py`](src/weight_analysis/examples/independent_analysis.py) genera pesos sintéticos,
 calcula unidades independientes y las agrega, sin checkpoints grandes ni red.
 
 ## Guías
 
 - [API, catálogo y ejecución independiente](docs/api.md).
+- [Organización de src y equivalencias de los scripts retirados](docs/repository_layout.md).
 - [Parquet NER real, arrays GPU de 8 horas y ejecución en Picasso](docs/picasso_experiments.md).
 - [Geometría comparativa fina: F1, entidades/idiomas, referencias, Parquet y continuidad ante errores](docs/comparative_geometry.md).
 - [Auditoría matemática y limitaciones](docs/mathematical_audit.md).
@@ -46,6 +47,6 @@ calcula unidades independientes y las agrega, sin checkpoints grandes ni red.
 - [Instalación, pruebas ejecutadas y limitaciones conocidas](docs/validation.md).
 
 Las rutas históricas `weightspace` se mantienen para reproducibilidad. La API nueva es
-`weight_analysis`; no añade infraestructura SLURM. Las pruebas pytest usan fixtures CPU y oráculos
-independientes. El paper objetivo y los datos reales no se han suministrado: las verificaciones
+`weight_analysis`; los adaptadores SLURM opcionales están en `scripts/picasso/`. Las pruebas pytest usan fixtures CPU y oráculos
+independientes. El paper objetivo y los pesos reales no están disponibles en este entorno: las verificaciones
 matemáticas no equivalen a confirmar hipótesis empíricas ni reproducir resultados del estudio.
