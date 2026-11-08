@@ -17,15 +17,25 @@ def main(argv=None):
     parser.add_argument("--account")
     parser.add_argument("--constraint")
     parser.add_argument("--retry", action="store_true")
+    parser.add_argument("--no-figures", action="store_true", help="Compact runs: do not submit the figure job")
     parser.add_argument(
         "--recover", action="store_true",
         help="Verify quarantined initial submissions with scontrol, then submit missing jobs only",
     )
     args = parser.parse_args(argv)
+    with_figures = not vars(args).pop("no_figures")
     recover = vars(args).pop("recover")
     if recover and args.retry:
         parser.error("--recover handles initial submissions; cannot combine with --retry")
     try:
+        if (Path(args.run_dir) / "manifest/plan.json").is_file():
+            from .compact import submit_compact
+
+            scripts = Path(args.scripts)
+            if scripts.name != "compact":
+                args.scripts = str(scripts / "compact")
+            submit_compact(**vars(args), recover=recover, with_figures=with_figures)
+            return 0
         if recover:
             from .recovery import recover_submissions
 

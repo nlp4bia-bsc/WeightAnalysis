@@ -42,7 +42,10 @@ def verify_signature(signature):
 def tokenizer_digest(path):
     path = Path(path)
     if (path / "tokenizer.json").is_file():
-        return stable_id(json.loads((path / "tokenizer.json").read_text()))
+        try:
+            return stable_id(json.loads((path / "tokenizer.json").read_text()))
+        except (OSError, ValueError):
+            return None  # Missing vocabulary evidence must not discard valid encoder weights.
     names = [
         n
         for n in (

@@ -16,7 +16,7 @@ def _option(command, name):
     return command[command.index(name) + 1]
 
 
-def _verify_job(job_id, command, script, root, *, array):
+def _verify_job(job_id, command, script, root, *, array, project_root=None):
     """Check the real owner, script and run-specific log paths using read-only scontrol."""
     try:
         response = subprocess.run(
@@ -45,7 +45,7 @@ def _verify_job(job_id, command, script, root, *, array):
     identity = fields.get("ArrayJobId") if array else fields.get("JobId")
     if identity != job_id or fields.get("Command") != str(script):
         raise ValueError("Accepted job ID or script differs from receipt; marker retained")
-    if fields.get("WorkDir") != str(Path(script).parents[2]):
+    if fields.get("WorkDir") != str(project_root or Path(script).parents[2]):
         raise ValueError("Accepted job working directory differs from project; marker retained")
     for field, flag in (("StdOut", "--output"), ("StdErr", "--error")):
         template = _option(command, flag)

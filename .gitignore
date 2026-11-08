@@ -17,3 +17,4 @@ build/
 /results_aggregated.parquet
 /local_results/
 !/scripts/picasso/*.sh
+!/scripts/picasso/compact/*.sh
