@@ -191,7 +191,26 @@ un resultado parcial; conserva cobertura, incidencias e índices pendientes en
 `derived/finalization.json`. El envío inicial es idempotente: repetirlo conserva los IDs ya
 registrados, incluso si solo falló el envío del finalizador. Una respuesta exitosa sin un ID
 reconocible se guarda en `submissions/unparsed-*.json` y bloquea un nuevo envío hasta verificar
-la cola; así no se duplican jobs de ID desconocido. Para reanudar desde login:
+la cola; así no se duplican jobs de ID desconocido.
+
+Picasso devolvió el ID `3549600` precedido de colores ANSI (`\u001b[31m\u001b[0m`).
+El adaptador elimina esos códigos y reconoce IDs estándar en stdout o stderr; varios IDs
+distintos siguen siendo ambiguos. Para recuperar un **envío inicial ya aceptado**, cuyo
+marcador ahora tiene un ID reconocible, sin repetir preparación ni tareas GPU:
+
+```bash
+bash scripts/picasso/submit.sh --run-dir "$RUN_DIR" --concurrency 16 --recover
+```
+
+La recuperación consulta `scontrol show job ID -o` y verifica propietario, ID, script,
+directorio de trabajo y rutas de log del run. Reconstruye el ledger desde el mapa original,
+conserva el marcador en `submissions/resolved/` junto con la verificación y envía solo los
+jobs ausentes (normalmente, el finalizador CPU). Si no puede verificar el job, conserva el
+bloqueo y muestra el error. No borrar marcadores a mano. `--recover` no se combina con
+`--retry`; el job debe seguir siendo consultable con scontrol. Esta corrección solo afecta
+al adaptador externo: conserva la firma científica y permite mantener `run-002`.
+
+Para reanudar tareas fallidas después de una finalización:
 
 ```bash
 bash scripts/picasso/submit.sh --run-dir "$RUN_DIR" --concurrency 1 --retry

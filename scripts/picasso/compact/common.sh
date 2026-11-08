@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+trap 'echo "[ERROR] job=${SLURM_JOB_ID:-local} line=$LINENO exit=$?" >&2' ERR
+module load pytorch/2.10.0
+PROJECT_DIR="${WEIGHT_ANALYSIS_PROJECT_DIR:-$PWD}"
+cd "$PROJECT_DIR"
+export PYTHONPATH="$PROJECT_DIR/src${PYTHONPATH:+:$PYTHONPATH}"
+export SINGULARITYENV_PYTHONPATH="$PYTHONPATH" APPTAINERENV_PYTHONPATH="$PYTHONPATH"
+export PYTHONUNBUFFERED=1
+export OMP_NUM_THREADS="${SLURM_CPUS_PER_TASK:-8}" MKL_NUM_THREADS="${SLURM_CPUS_PER_TASK:-8}" OPENBLAS_NUM_THREADS="${SLURM_CPUS_PER_TASK:-8}"
+export MPLCONFIGDIR="${TMPDIR:-/tmp}/wa-mpl-${SLURM_JOB_ID:-local}"
+echo "[RUNTIME] job=${SLURM_JOB_ID:-local} host=$(hostname) project=$PROJECT_DIR"

@@ -37,6 +37,7 @@ calcula unidades independientes y las agrega, sin checkpoints grandes ni red.
 
 ## Guías
 
+- [MultiClinNER compacto: Parquet por estudio, reanudación y Picasso](docs/multiclinner_compact.md).
 - [API, catálogo y ejecución independiente](docs/api.md).
 - [Organización de src y equivalencias de los scripts retirados](docs/repository_layout.md).
 - [Parquet NER real, arrays GPU de 8 horas y ejecución en Picasso](docs/picasso_experiments.md).

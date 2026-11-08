@@ -174,6 +174,7 @@ def spectral_metrics(
     device: str | None = None,
     curve_points: int = 32,
     quantile_points: int = 21,
+    return_spectrum: bool = False,
 ) -> dict:
     """Compute selected spectral statistics with at most one decomposition.
 
@@ -200,11 +201,17 @@ def spectral_metrics(
     norm = float(torch.linalg.vector_norm(matrix))
     result = {"status": "not_required"}
     cheap = {"matrix_fro", "normalized_weight_quantiles"}
-    needs_svd = bool(set(names) - cheap)
+    needs_svd = bool(set(names) - cheap) or return_spectrum
+    if return_spectrum:
+        result["singular_values"] = None
+        result["spectrum_complete"] = False
     if needs_svd and mode == "skip":
         result["status"] = "disabled"
     if norm <= EPS:
         result["status"] = "zero_matrix"
+        if return_spectrum and norm == 0:
+            result["singular_values"] = [0.0] * min(matrix.shape)
+            result["spectrum_complete"] = True
         for name in names:
             result[name] = (
                 0.0
@@ -253,6 +260,9 @@ def spectral_metrics(
             )
         result["status"] = "topk_approx"
     singular = torch.sort(singular.clamp_min(0), descending=True).values
+    if return_spectrum:
+        result["singular_values"] = singular.tolist()
+        result["spectrum_complete"] = bool(full)
     energy = singular.square()
     total_energy = norm**2
     sigma_probability = singular / singular.sum()

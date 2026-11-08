@@ -18,3 +18,5 @@
 - Todo el código de producción vive en src/ (weight_analysis, weight_analysis_scheduler y weightspace).
   Los ejemplos ejecutables también se distribuyen como módulos; no restaurar launchers Python de raíz.
 - Mantener README y AGENTS breves; detalles científicos y contratos públicos pertenecen a `docs/`.
+- MultiClinNER nuevo usa `experiments.compact`: diario por tarea y Parquet agrupados por estudio;
+  no crear archivos por tensor ni escribir sobre runs históricos.

@@ -9,17 +9,21 @@ from uuid import uuid4
 from .manifest import atomic_json, load_plan
 
 
-def parse_job_id(output):
-    identifiers = []
-    for line in output.splitlines():
-        match = re.fullmatch(
-            r"\s*(?:Submitted batch job\s+)?([0-9]+)(?:;[A-Za-z0-9_.-]+)?\s*", line
-        )
-        if match:
-            identifiers.append(match.group(1))
+def parse_job_id(output, stderr=""):
+    """Accept standard Slurm records in either stream, rejecting conflicting IDs."""
+    identifiers = set()
+    for stream in (output, stderr):
+        # Login wrappers sometimes add terminal colour or repeat the same ID.
+        clean = re.sub(r"\x1b\[[0-?]*[ -/]*[@-~]", "", stream)
+        for line in clean.splitlines():
+            match = re.fullmatch(
+                r"\s*(?:Submitted batch job\s+)?([0-9]+)(?:;[A-Za-z0-9_.-]+)?\s*", line
+            )
+            if match:
+                identifiers.add(match.group(1))
     if len(identifiers) != 1:
         raise ValueError("Successful sbatch output has no unique job ID")
-    return identifiers[0]
+    return identifiers.pop()
 
 
 def _submit_checked(command, root, run_id):
@@ -38,7 +42,10 @@ def _submit_checked(command, root, run_id):
             f"sbatch rejected submission: {exc.stderr or exc.stdout or str(exc)}"
         ) from exc
     try:
-        return parse_job_id(response.stdout)
+        job_id = parse_job_id(response.stdout, getattr(response, "stderr", "") or "")
+        if getattr(response, "stderr", ""):
+            print("[SBATCH STDERR]", response.stderr[:4000].rstrip(), flush=True)
+        return job_id
     except ValueError as exc:
         path = root / "submissions" / f"unparsed-{uuid4().hex}.json"
         atomic_json(
@@ -46,7 +53,9 @@ def _submit_checked(command, root, run_id):
             dict(run_id=run_id, command=command, stdout=response.stdout, stderr=response.stderr),
         )
         raise RuntimeError(
-            f"Unrecognized successful sbatch response; recorded in {path}. Check the queue before resolving the marker; do not resubmit blindly."
+            f"Unrecognized successful sbatch response; recorded in {path}. "
+            "Check the queue before resolving the marker; do not resubmit blindly. "
+            f"stdout={response.stdout[:1000]!r} stderr={response.stderr[:1000]!r}"
         ) from exc
 
 
