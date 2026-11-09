@@ -31,7 +31,7 @@ weightspace-parallel = "weightspace.parallel:main"
 weightspace-reports = "weightspace.reports.__main__:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/weight_analysis", "src/weightspace", "src/weight_analysis_scheduler"]
+packages = ["src/weight_analysis", "src/weightspace", "src/weight_analysis_scheduler", "src/weight_analysis_exports"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
